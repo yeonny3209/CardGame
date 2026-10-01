@@ -6,6 +6,7 @@ import type { ActionOption, Answer, CardDef, CardInstance, Controller, PlayerId,
 import type { Deck } from '../deck/deck';
 import { toDefs } from '../deck/deck';
 import { cardBack, cardFace, detailHtml, fieldCard } from './cardView';
+import { askConfirm } from './dialog';
 
 const ME: PlayerId = 0;
 const AI_PLAYER: PlayerId = 1;
@@ -237,8 +238,8 @@ export class DuelScreen {
     const tools = h('div', 'side-tools');
     const surrender = h('button', 'btn ghost', '항복');
     surrender.disabled = this.finished;
-    surrender.addEventListener('click', () => {
-      if (!confirm('항복하시겠습니까?')) return;
+    surrender.addEventListener('click', async () => {
+      if (!(await askConfirm('항복하시겠습니까?', '항복'))) return;
       this.surrender();
     });
     const mode = h('button', 'btn ghost', this.chainMode === 'auto' ? '체인 확인: 자동' : '체인 확인: 항상');

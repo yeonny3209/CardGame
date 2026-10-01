@@ -16,6 +16,7 @@ import {
 import type { Deck } from '../deck/deck';
 import type { CardDef } from '../engine/types';
 import { ATTR_LABEL, cardFace, detailHtml, frameClass } from './cardView';
+import { askConfirm, askText, showMessage } from './dialog';
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -131,8 +132,8 @@ export class DeckBuilder {
     // ---------------- toolbar
     const bar = h('div', 'toolbar');
     const back = h('button', 'btn ghost', '← 메뉴');
-    back.addEventListener('click', () => {
-      if (this.dirty && !confirm('저장하지 않은 변경 사항이 있습니다. 나가시겠습니까?')) return;
+    back.addEventListener('click', async () => {
+      if (this.dirty && !(await askConfirm('저장하지 않은 변경 사항이 있습니다. 나가시겠습니까?', '나가기'))) return;
       this.onExit();
     });
     const pick = h('select', 'deck-pick');
@@ -142,8 +143,8 @@ export class DeckBuilder {
       if (i === this.currentIndex) o.selected = true;
       pick.append(o);
     });
-    pick.addEventListener('change', () => {
-      if (this.dirty && !confirm('저장하지 않은 변경 사항을 버릴까요?')) {
+    pick.addEventListener('change', async () => {
+      if (this.dirty && !(await askConfirm('저장하지 않은 변경 사항을 버릴까요?', '버리기'))) {
         pick.value = String(this.currentIndex);
         return;
       }
@@ -189,8 +190,12 @@ export class DeckBuilder {
         this.dirty = false;
         this.render();
       }),
-      mk('삭제', () => {
-        if (this.decks.length <= 1 || !confirm(`「${this.current.name}」을(를) 삭제할까요?`)) return;
+      mk('삭제', async () => {
+        if (this.decks.length <= 1) {
+          await showMessage('덱이 하나뿐이라 삭제할 수 없습니다.');
+          return;
+        }
+        if (!(await askConfirm(`「${this.current.name}」을(를) 삭제할까요?`, '삭제'))) return;
         this.decks.splice(this.currentIndex, 1);
         this.currentIndex = 0;
         this.current = this.clone(this.decks[0]);
@@ -200,17 +205,19 @@ export class DeckBuilder {
       }),
       mk('덱 코드 복사', () => {
         const code = encodeDeck(this.current);
-        navigator.clipboard?.writeText(code).then(
-          () => alert('덱 코드를 클립보드에 복사했습니다.'),
-          () => prompt('덱 코드:', code),
-        ) ?? prompt('덱 코드:', code);
+        const fallback = () => void askText('덱 코드 (선택해서 복사하세요)', code, '닫기');
+        try {
+          navigator.clipboard.writeText(code).then(() => showMessage('덱 코드를 클립보드에 복사했습니다.'), fallback);
+        } catch {
+          fallback();
+        }
       }),
-      mk('덱 코드 가져오기', () => {
-        const code = prompt('덱 코드를 붙여 넣으세요');
+      mk('덱 코드 가져오기', async () => {
+        const code = await askText('덱 코드를 붙여 넣으세요', '', '가져오기');
         if (!code) return;
         const deck = decodeDeck(code);
         if (!deck) {
-          alert('올바른 덱 코드가 아닙니다.');
+          await showMessage('올바른 덱 코드가 아닙니다.');
           return;
         }
         this.decks.push(deck);
@@ -220,8 +227,8 @@ export class DeckBuilder {
         this.dirty = false;
         this.render();
       }),
-      mk('초기화', () => {
-        if (!confirm('덱의 카드를 모두 비울까요?')) return;
+      mk('초기화', async () => {
+        if (!(await askConfirm('덱의 카드를 모두 비울까요?', '비우기'))) return;
         this.current.main = [];
         this.current.extra = [];
         this.dirty = true;

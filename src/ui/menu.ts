@@ -2,6 +2,7 @@
 import { STARTER_DECKS, loadSavedDecks, validateDeck } from '../deck/deck';
 import type { Deck } from '../deck/deck';
 import { DeckBuilder } from './deckBuilder';
+import { showMessage } from './dialog';
 import { DuelScreen } from './duelView';
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -65,7 +66,7 @@ export function showMenu(container: HTMLElement): void {
     const aiIdx = Number(ai.s.value);
     const aiDeck = aiIdx < 0 ? STARTER_DECKS[Math.floor(Math.random() * STARTER_DECKS.length)] : decks[aiIdx];
     if (!myDeck || validateDeck(myDeck).length) {
-      alert('사용 가능한 덱을 선택하세요.');
+      void showMessage('사용 가능한 덱을 선택하세요.');
       return;
     }
     new DuelScreen(container, myDeck, aiDeck, () => showMenu(container)).start();
