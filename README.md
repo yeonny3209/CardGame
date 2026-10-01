@@ -2,6 +2,12 @@
 
 유희왕 마스터 듀얼 스타일의 브라우저 트레이딩 카드 게임입니다. 모든 카드는 이 프로젝트용으로 새로 만든 오리지널 카드입니다.
 
+## 플레이
+
+배포 주소: https://yeonny3209.github.io/CardGame/
+
+`main` 또는 작업 브랜치에 푸시하면 GitHub Actions가 테스트·빌드 후 `gh-pages` 브랜치로 배포합니다 (`.github/workflows/deploy.yml`).
+
 ## 실행
 
 ```bash
