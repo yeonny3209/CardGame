@@ -907,3 +907,29 @@ select {
   --cw: clamp(56px, 6vw, 76px);
   --ch: calc(var(--cw) * 1.46);
 }
+
+/* Zone placement: free zones glow and show where the card will go. */
+.pick-zone {
+  cursor: pointer;
+  border: 2px solid var(--accent);
+  background: rgba(240, 180, 60, 0.14);
+  animation: glow 1.2s ease-in-out infinite;
+}
+.pick-zone:hover {
+  background: rgba(240, 180, 60, 0.34);
+}
+.pick-label {
+  position: static;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.zone-card {
+  float: left;
+  margin-right: 10px;
+}
+.prompt::after {
+  content: '';
+  display: block;
+  clear: both;
+}

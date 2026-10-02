@@ -24,6 +24,8 @@ export function defaultAnswer(req: Request): Answer {
       return 'atk';
     case 'attackTarget':
       return null;
+    case 'zone':
+      return req.free[0];
   }
 }
 

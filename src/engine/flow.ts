@@ -152,7 +152,10 @@ export async function activate(duel: Duel, p: PlayerId, uid: number, idx: number
         const old = duel.players[p].fzone;
         if (old !== null) duel.sendTo([duel.card(old)], 'gy', ['rule'], p);
         duel.place(c, 'fzone', { faceUp: true });
-      } else duel.place(c, 'szone', { faceUp: true });
+      } else {
+        const zone = await duel.chooseZone(p, 'szone', c);
+        duel.place(c, 'szone', { faceUp: true, zone: zone ?? undefined });
+      }
     } else c.faceUp = true;
   }
   const link: ChainLink = {
@@ -381,24 +384,29 @@ function lastSummonEvents(duel: Duel, since: number): DuelEvent[] {
   return duel.events.filter((e) => e.seq > since && (e.type === 'summoned' || e.type === 'flipped'));
 }
 
-async function normalSummon(duel: Duel, uid: number, set: boolean): Promise<void> {
+/** Returns false when the player backed out before anything was committed. */
+async function normalSummon(duel: Duel, uid: number, set: boolean): Promise<boolean> {
   const p = duel.turnPlayer;
   const c = duel.card(uid);
   const n = tributesNeeded(c.def);
   if (n > 0) {
     const combos = combinations(duel.monsters(p), n);
     const chosen = await selectCombo(duel, p, combos, `릴리스할 몬스터 ${n}장 선택`);
-    if (!chosen) return;
+    if (!chosen) return false;
     for (const t of chosen) duel.addLog(`${duel.cardName(t.uid, true)} 릴리스`, p);
     duel.sendTo(chosen, 'gy', ['tribute', 'cost'], p);
   }
+  // Without tributes nothing has been paid yet, so the player may still back out here.
+  const zone = await duel.chooseZone(p, 'mzone', c, n === 0);
+  if (zone === null) return false;
   duel.players[p].normalSummonUsed = true;
   if (set) {
-    duel.summonToField(c, p, n > 0 ? 'tribute' : 'normal', 'def', false);
+    duel.summonToField(c, p, n > 0 ? 'tribute' : 'normal', 'def', false, zone);
     c.summonType = null;
   } else {
-    duel.summonToField(c, p, n > 0 ? 'tribute' : 'normal', 'atk');
+    duel.summonToField(c, p, n > 0 ? 'tribute' : 'normal', 'atk', true, zone);
   }
+  return true;
 }
 
 async function flipSummon(duel: Duel, uid: number): Promise<void> {
@@ -430,8 +438,9 @@ async function extraSummon(duel: Duel, uid: number, method: 'synchro' | 'xyz'): 
     duel.addLog(`엑시즈 소재: ${mats.map((m) => duel.cardName(m.uid)).join(', ')}`, p);
     for (const m of mats) duel.place(m, 'overlay');
   }
+  const zone = await duel.chooseZone(p, 'mzone', c);
   const pos = await choosePosition(duel, p, c);
-  duel.summonToField(c, p, method, pos);
+  duel.summonToField(c, p, method, pos, true, zone ?? undefined);
   if (method === 'xyz') c.overlay = mats.map((m) => m.uid);
 }
 
@@ -496,8 +505,9 @@ async function mainPhase(duel: Duel, phase: 'main1' | 'main2'): Promise<'toBattl
     switch (act.kind) {
       case 'normalSummon':
       case 'setMonster':
-        await normalSummon(duel, act.uid, act.kind === 'setMonster');
-        await responseWindow(duel, lastSummonEvents(duel, since), { skipTurnPlayer: true });
+        if (await normalSummon(duel, act.uid, act.kind === 'setMonster')) {
+          await responseWindow(duel, lastSummonEvents(duel, since), { skipTurnPlayer: true });
+        }
         break;
       case 'flipSummon':
         await flipSummon(duel, act.uid);
@@ -512,7 +522,12 @@ async function mainPhase(duel: Duel, phase: 'main1' | 'main2'): Promise<'toBattl
       }
       case 'setST': {
         const c = duel.card(act.uid);
-        duel.place(c, c.def.spellKind === 'field' ? 'fzone' : 'szone', { faceUp: false });
+        if (c.def.spellKind === 'field') duel.place(c, 'fzone', { faceUp: false });
+        else {
+          const zone = await duel.chooseZone(p, 'szone', c, true);
+          if (zone === null) break;
+          duel.place(c, 'szone', { faceUp: false, zone });
+        }
         duel.addLog(`${duel.names[p]} 마법·함정 카드 세트`, p);
         break;
       }

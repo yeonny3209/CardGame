@@ -370,8 +370,19 @@ export class DuelScreen {
       }
       cells.push(f);
     } else cells.push(this.pile(p, 'extra', opts));
-    zones.forEach((uid) => {
+    const zreq = this.pending?.req.type === 'zone' ? this.pending.req : null;
+    const pickable = (i: number) =>
+      p === ME && zreq !== null && zreq.kind === (kind === 'mz' ? 'mzone' : 'szone') && zreq.free.includes(i);
+    zones.forEach((uid, zi) => {
       const z = h('div', `zone ${kind === 'mz' ? 'mzone' : 'szone'}`);
+      if (pickable(zi)) {
+        z.classList.add('pick-zone');
+        z.append(h('span', 'pick-label', '여기에'));
+        z.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.answer(zi);
+        });
+      }
       if (uid !== null) {
         const c = d.card(uid);
         const elm = fieldCard(d, c, ME);
@@ -512,6 +523,15 @@ export class DuelScreen {
         }
         if (req.direct) btn('직접 공격', () => this.answer(-1), 'btn primary');
         btn('취소', () => this.answer(null), 'btn ghost');
+        break;
+      }
+      case 'zone': {
+        const c = this.duel.card(req.uid);
+        text.textContent = `${req.prompt} 빛나는 칸을 클릭하세요.`;
+        const hint = h('div', 'zone-card');
+        hint.append(cardFace(c.def, { small: true }));
+        box.prepend(hint);
+        if (req.cancellable) btn('취소', () => this.answer(null), 'btn ghost');
         break;
       }
       case 'select':

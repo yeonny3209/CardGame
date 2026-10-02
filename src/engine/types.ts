@@ -264,7 +264,18 @@ export type Request =
   | { type: 'option'; player: PlayerId; prompt: string; options: string[] }
   | { type: 'yesno'; player: PlayerId; prompt: string }
   | { type: 'position'; player: PlayerId; uid: number; prompt: string }
-  | { type: 'attackTarget'; player: PlayerId; attacker: number; targets: number[]; direct: boolean };
+  | { type: 'attackTarget'; player: PlayerId; attacker: number; targets: number[]; direct: boolean }
+  /** Pick which free Monster / Spell & Trap Zone (index 0-4, left to right) a card is placed in. */
+  | {
+      type: 'zone';
+      player: PlayerId;
+      kind: 'mzone' | 'szone';
+      uid: number;
+      free: number[];
+      prompt: string;
+      /** Answering null cancels the action (only offered while nothing has been paid yet). */
+      cancellable: boolean;
+    };
 
 export type Answer = number | number[] | boolean | Position | null;
 

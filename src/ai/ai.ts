@@ -96,6 +96,8 @@ function decide(duel: Duel, me: PlayerId, req: Request): Answer {
       const def = c.def.def ?? 0;
       return atk >= strongestAtk(duel, other(me)) || atk >= def ? 'atk' : 'def';
     }
+    case 'zone':
+      return req.free[0];
     case 'attackTarget': {
       const a = duel.card(req.attacker);
       const best = bestTarget(duel, a, req.targets, req.direct);

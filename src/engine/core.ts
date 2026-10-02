@@ -432,7 +432,7 @@ export class Duel {
   place(
     c: CardInstance,
     dest: Location,
-    opts: { controller?: PlayerId; faceUp?: boolean; position?: Position; bottom?: boolean } = {},
+    opts: { controller?: PlayerId; faceUp?: boolean; position?: Position; bottom?: boolean; zone?: number } = {},
   ): void {
     const wasOnField = this.isOnField(c);
     const wasMonsterZone = c.location === 'mzone';
@@ -447,7 +447,7 @@ export class Duel {
     const ps = this.players[controller];
     switch (dest) {
       case 'mzone': {
-        const i = ps.mzone.indexOf(null);
+        const i = opts.zone !== undefined && ps.mzone[opts.zone] === null ? opts.zone : ps.mzone.indexOf(null);
         if (i < 0) throw new Error('No free Monster Zone');
         ps.mzone[i] = c.uid;
         c.faceUp = opts.faceUp ?? true;
@@ -456,7 +456,7 @@ export class Duel {
         break;
       }
       case 'szone': {
-        const i = ps.szone.indexOf(null);
+        const i = opts.zone !== undefined && ps.szone[opts.zone] === null ? opts.zone : ps.szone.indexOf(null);
         if (i < 0) throw new Error('No free Spell & Trap Zone');
         ps.szone[i] = c.uid;
         c.faceUp = opts.faceUp ?? true;
@@ -613,6 +613,29 @@ export class Duel {
     throw new DuelOver(winner, reason);
   }
 
+  /**
+   * Let `p` pick which free zone `c` goes to. With a single free zone nothing is asked.
+   * Returns the zone index, or null when the player cancelled (only possible if `cancellable`).
+   */
+  async chooseZone(p: PlayerId, kind: 'mzone' | 'szone', c: CardInstance, cancellable = false): Promise<number | null> {
+    const zones = kind === 'mzone' ? this.players[p].mzone : this.players[p].szone;
+    const free = zones.flatMap((u, i) => (u === null ? [i] : []));
+    if (free.length === 0) throw new Error(`No free ${kind}`);
+    if (free.length === 1 && !cancellable) return free[0];
+    const what = kind === 'mzone' ? '몬스터 존' : '마법·함정 존';
+    const ans = await this.ask({
+      type: 'zone',
+      player: p,
+      kind,
+      uid: c.uid,
+      free,
+      prompt: `${this.cardName(c.uid, true)}을(를) 놓을 ${what}을 선택하세요.`,
+      cancellable,
+    });
+    if (ans === null && cancellable) return null;
+    return typeof ans === 'number' && free.includes(ans) ? ans : free[0];
+  }
+
   /** Put a monster on the field as a summon and emit the event. */
   summonToField(
     c: CardInstance,
@@ -620,8 +643,9 @@ export class Duel {
     type: SummonType,
     position: Position,
     faceUp = true,
+    zone?: number,
   ): void {
-    this.place(c, 'mzone', { controller: p, faceUp, position });
+    this.place(c, 'mzone', { controller: p, faceUp, position, zone });
     c.summonType = type;
     c.positionChangedTurn = -1;
     if (type === 'fusion' || type === 'synchro' || type === 'xyz' || type === 'ritual') c.properlySummoned = true;

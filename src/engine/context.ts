@@ -194,8 +194,9 @@ export class EffectContext {
     const p = opts.player ?? this.player;
     if (this.duel.freeMZones(p) === 0) return false;
     if ((opts.type ?? 'special') === 'special' && !this.duel.canBeSpecialSummoned(c)) return false;
+    const zone = await this.duel.chooseZone(p, 'mzone', c);
     const pos = opts.position ?? (await this.choosePosition(c, p));
-    this.duel.summonToField(c, p, opts.type ?? 'special', pos);
+    this.duel.summonToField(c, p, opts.type ?? 'special', pos, true, zone ?? undefined);
     return true;
   }
 
