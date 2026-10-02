@@ -167,6 +167,25 @@ export function fieldCard(duel: Duel, c: CardInstance, viewer: number): HTMLElem
   return face;
 }
 
+/** Card text with each ①②… effect on its own line and the effect number highlighted. */
+export function cardTextBlock(text: string): HTMLElement {
+  const box = el('div', 'card-text');
+  const numbered = /^[①-⑩]:/m.test(text);
+  for (const line of text.split('\n')) {
+    const row = el('p', 'text-line');
+    const m = line.match(/^([①-⑩]):\s*(.*)$/);
+    if (m) {
+      row.classList.add('eff');
+      row.append(el('span', 'eff-no', m[1]), document.createTextNode(m[2]));
+    } else {
+      if (numbered) row.classList.add('note');
+      row.textContent = line;
+    }
+    box.append(row);
+  }
+  return box;
+}
+
 export function detailHtml(def: CardDef, extra?: { duel: Duel; card: CardInstance }): HTMLElement {
   const wrap = el('div', 'detail');
   wrap.append(cardFace(def, extra && extra.card.location === 'mzone' && extra.card.faceUp ? { stats: { atk: extra.duel.atk(extra.card), def: extra.duel.defense(extra.card) } } : {}));
@@ -181,9 +200,7 @@ export function detailHtml(def: CardDef, extra?: { duel: Duel; card: CardInstanc
   const lim = copyLimit(def.id);
   if (lim < 3) meta.push(lim === 0 ? '금지 카드' : lim === 1 ? '제한 카드 (1장)' : '준제한 카드 (2장)');
   for (const m of meta) info.append(el('div', 'meta', m));
-  const text = el('p', 'card-text');
-  text.textContent = def.text;
-  info.append(text);
+  info.append(cardTextBlock(def.text));
   if (extra) {
     const c = extra.card;
     const st: string[] = [];

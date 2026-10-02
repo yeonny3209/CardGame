@@ -421,6 +421,7 @@ select {
 }
 .hand.opp {
   --cw: clamp(28px, min(3.4vw, 5vh), 56px);
+  --ch: calc(var(--cw) * 1.46);
 }
 .hand.me .card:hover {
   transform: translateY(-6px);
@@ -536,12 +537,29 @@ select {
   color: var(--accent);
 }
 .card-text {
-  white-space: pre-wrap;
   font-size: 0.85rem;
-  line-height: 1.5;
+  line-height: 1.55;
   background: var(--bg2);
-  padding: 8px;
+  padding: 8px 10px;
   border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.text-line {
+  margin: 0;
+}
+.text-line.note {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.eff-no {
+  color: var(--accent);
+  font-weight: 700;
+}
+.eff-no::after {
+  content: ':';
+  margin-right: 5px;
 }
 .log {
   flex: 1;
@@ -715,6 +733,7 @@ select {
 }
 .pool-grid {
   --cw: 70px;
+  --ch: calc(var(--cw) * 1.46);
 }
 .pool-grid .card {
   cursor: pointer;
@@ -838,4 +857,53 @@ select {
 .mini:focus-visible {
   outline: 2px solid var(--accent2);
   outline-offset: 2px;
+}
+
+/* Card list dialogs carry their own detail pane (the side panel is dimmed behind the backdrop). */
+.modal.wide {
+  max-width: 1080px;
+}
+.modal-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.modal-main {
+  flex: 1;
+  min-width: 0;
+}
+.modal-detail {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  max-height: calc(90vh - 90px);
+  overflow: auto;
+}
+.modal-detail .card-text {
+  background: var(--panel);
+}
+@media (max-width: 860px) {
+  .modal-body {
+    flex-direction: column-reverse;
+  }
+  .modal-detail {
+    --cw: 54px;
+    --ch: calc(var(--cw) * 1.46);
+    width: 100%;
+    position: static;
+    max-height: 50vh;
+  }
+}
+.modal-detail {
+  --cw: 68px;
+  --ch: calc(var(--cw) * 1.46);
+}
+.modal-main .card-grid {
+  --cw: clamp(56px, 6vw, 76px);
+  --ch: calc(var(--cw) * 1.46);
 }

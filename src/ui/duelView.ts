@@ -270,12 +270,30 @@ export class DuelScreen {
     if (this.finished) root.append(this.renderResult());
   }
 
+  private canSee(c: CardInstance): boolean {
+    return c.controller === ME || c.faceUp || c.location === 'gy' || c.location === 'banished';
+  }
+
+  /** Update the side panel and, when a card list dialog is open, its own detail pane. */
   private showDetail(c: CardInstance): void {
-    const visible = c.controller === ME || c.faceUp || c.location === 'gy' || c.location === 'banished';
-    if (!visible && !(c.location === 'hand' && c.owner === ME)) return;
+    if (!this.canSee(c)) return;
     this.detail = { def: c.def, card: c };
-    const slot = this.root.querySelector('.detail-slot');
-    if (slot) slot.replaceChildren(detailHtml(c.def, { duel: this.duel, card: c }));
+    this.root.querySelectorAll('.detail-slot, .modal-detail').forEach((slot) => {
+      slot.replaceChildren(detailHtml(c.def, { duel: this.duel, card: c }));
+    });
+  }
+
+  /**
+   * Card list dialogs dim the board, which hides the side panel. Give them a detail pane of their own,
+   * starting with the card that was last hovered (or the first card in the list).
+   */
+  private modalDetail(uids: number[]): HTMLElement {
+    const pane = h('div', 'modal-detail');
+    const hovered = this.detail?.card && uids.includes(this.detail.card.uid) ? this.detail.card : null;
+    const cur = hovered ?? (uids.length ? this.duel.card(uids[0]) : null);
+    if (cur && this.canSee(cur)) pane.append(detailHtml(cur.def, { duel: this.duel, card: cur }));
+    else pane.append(h('div', 'hint', '카드에 마우스를 올리면 효과 텍스트가 표시됩니다.'));
+    return pane;
   }
 
   private bindCard(elm: HTMLElement, c: CardInstance, opts: Map<number, number[]>): void {
@@ -508,8 +526,8 @@ export class DuelScreen {
     if (!this.pileView) return null;
     const { player, loc } = this.pileView;
     const overlay = h('div', 'modal-backdrop');
-    const modal = h('div', 'modal');
-    modal.append(h('h3', '', `${this.duel.names[player]}의 ${LOC_LABEL[loc]}`));
+    const modal = h('div', 'modal wide');
+    modal.append(h('h3', '', `${this.duel.names[player]}의 ${LOC_LABEL[loc]} (${this.duel.players[player][loc].length}장)`));
     const grid = h('div', 'card-grid');
     for (const uid of [...this.duel.players[player][loc]].reverse()) {
       const c = this.duel.card(uid);
@@ -523,7 +541,11 @@ export class DuelScreen {
       this.pileView = null;
       this.render();
     });
-    modal.append(grid, close);
+    const main = h('div', 'modal-main');
+    main.append(grid, close);
+    const body = h('div', 'modal-body');
+    body.append(main, this.modalDetail(this.duel.players[player][loc]));
+    modal.append(body);
     overlay.append(modal);
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) {
@@ -537,7 +559,7 @@ export class DuelScreen {
   private renderSelect(req: Extract<Request, { type: 'select' }>): HTMLElement {
     const d = this.duel;
     const overlay = h('div', 'modal-backdrop');
-    const modal = h('div', 'modal');
+    const modal = h('div', 'modal wide');
     modal.append(h('h3', '', req.prompt));
     modal.append(h('div', 'hint', req.min === req.max ? `${req.min}장 선택` : `${req.min}~${req.max}장 선택`));
     const grid = h('div', 'card-grid');
@@ -559,6 +581,7 @@ export class DuelScreen {
       wrap.append(face, h('div', 'choice-label', `${owner} · ${LOC_LABEL[c.location]}`));
       if (this.selection.has(uid)) wrap.classList.add('chosen');
       wrap.addEventListener('click', () => {
+        this.showDetail(c);
         if (this.selection.has(uid)) this.selection.delete(uid);
         else {
           if (req.max === 1) this.selection.clear();
@@ -579,7 +602,11 @@ export class DuelScreen {
       skip.addEventListener('click', () => this.answer([]));
       buttons.append(skip);
     }
-    modal.append(grid, buttons);
+    const main = h('div', 'modal-main');
+    main.append(grid, buttons);
+    const body = h('div', 'modal-body');
+    body.append(main, this.modalDetail(req.candidates));
+    modal.append(body);
     overlay.append(modal);
     return overlay;
   }
