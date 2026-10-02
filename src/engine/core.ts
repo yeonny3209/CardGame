@@ -492,6 +492,7 @@ export class Duel {
       const mats = c.overlay.splice(0);
       for (const m of mats) {
         const mc = this.card(m);
+        this.addLog(`${this.cardName(c.uid, true)}가 필드를 떠나 엑시즈 소재 ${this.cardName(m, true)}도 묘지로`, c.owner);
         mc.location = 'gy';
         mc.version += 1;
         mc.faceUp = true;

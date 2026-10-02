@@ -64,7 +64,8 @@ export const detachCost = (n = 1): CostSpec => ({
   pay: async (ctx) => {
     const mats = ctx.self.overlay.map((u) => ctx.duel.card(u));
     const chosen = await ctx.select(mats, { prompt: `떼어낼 엑시즈 소재 ${n}개`, min: n, max: n, purpose: 'cost' });
-    ctx.duel.addLog(`엑시즈 소재 ${chosen.length}개를 떼어냄`, ctx.player);
+    const names = chosen.map((c) => ctx.duel.cardName(c.uid, true)).join(', ');
+    ctx.duel.addLog(`${ctx.duel.cardName(ctx.uid)}의 엑시즈 소재 ${names}을(를) 떼어내 묘지로 보냄`, ctx.player);
     ctx.duel.sendTo(chosen, 'gy', ['cost', 'detach'], ctx.player);
   },
 });
