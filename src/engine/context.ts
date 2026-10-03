@@ -200,6 +200,26 @@ export class EffectContext {
     return true;
   }
 
+  /** This turn, `p` may make `n` more Normal Summons / Sets. */
+  addNormalSummons(n: number, p: PlayerId = this.player): void {
+    this.duel.players[p].extraNormalSummons += n;
+    this.duel.addLog(`${this.duel.names[p]}: 이 턴, 일반 소환·세트를 ${n}번 더 할 수 있다`, p);
+  }
+
+  /** Set a Spell/Trap card from anywhere (deck, GY, …) face-down into a zone of the player's choice. */
+  async setSpellTrap(c: CardInstance, p: PlayerId = this.player): Promise<boolean> {
+    if (c.def.category === 'monster') return false;
+    const field = c.def.spellKind === 'field';
+    if (field ? this.duel.players[p].fzone !== null : this.duel.freeSZones(p) === 0) return false;
+    if (field) this.duel.place(c, 'fzone', { faceUp: false });
+    else {
+      const zone = await this.duel.chooseZone(p, 'szone', c);
+      this.duel.place(c, 'szone', { faceUp: false, zone: zone ?? undefined });
+    }
+    this.duel.addLog(`${this.duel.names[p]} 마법·함정 카드 세트`, p);
+    return true;
+  }
+
   damage(p: PlayerId, amount: number): void {
     this.duel.damage(p, amount, ['effect'], this.player);
   }

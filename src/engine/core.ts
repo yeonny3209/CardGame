@@ -46,7 +46,10 @@ export interface PlayerState {
   mzone: (number | null)[];
   szone: (number | null)[];
   fzone: number | null;
-  normalSummonUsed: boolean;
+  /** Normal Summons / Sets made this turn. */
+  normalSummons: number;
+  /** Additional Normal Summons granted for this turn by card effects. */
+  extraNormalSummons: number;
 }
 
 export interface PendingTrigger {
@@ -156,7 +159,8 @@ export class Duel {
       mzone: Array(MZONES).fill(null),
       szone: Array(SZONES).fill(null),
       fzone: null,
-      normalSummonUsed: false,
+      normalSummons: 0,
+      extraNormalSummons: 0,
     });
     this.players = [mk(0), mk(1)];
     for (const p of [0, 1] as PlayerId[]) {
@@ -182,6 +186,7 @@ export class Duel {
       positionChangedTurn: -1,
       attacksThisTurn: 0,
       overlay: [],
+      summonTributes: 0,
       equippedTo: null,
       buffs: [],
     };
@@ -440,6 +445,7 @@ export class Duel {
     c.version += 1;
     c.buffs = [];
     c.attacksThisTurn = 0;
+    c.summonTributes = 0;
     if (wasOnField && !isFieldLocation(dest)) c.equippedTo = null;
     const controller = isFieldLocation(dest) ? (opts.controller ?? c.controller) : c.owner;
     c.controller = controller;

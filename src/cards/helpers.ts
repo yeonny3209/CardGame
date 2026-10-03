@@ -1,6 +1,7 @@
 // Building blocks for card scripts.
 import type { EffectContext } from '../engine/context';
 import { fusionCombos, ritualCombos, selectCombo } from '../engine/materials';
+import { releaseValue, tributeCombos, tributesFor } from '../engine/tribute';
 import type {
   Attribute,
   CardDef,
@@ -265,4 +266,44 @@ export function opponentAttacking(ctx: EffectContext): boolean {
 export function isAttacker(ctx: EffectContext, c: CardInstance): boolean {
   const b = ctx.duel.battle;
   return !!b && b.attacker === c.uid && b.attackerVersion === c.version;
+}
+
+// ---------------------------------------------------------------- Tribute Summons and Setting by effect
+
+/** Could `ctx.player` Advance Summon `c` by an effect right now? */
+export function canAdvanceSummon(ctx: EffectContext, c: CardInstance, reduce = 0): boolean {
+  const need = Math.max(0, tributesFor(ctx.duel, c) - reduce);
+  if (need === 0) return ctx.duel.freeMZones(ctx.player) > 0;
+  return tributeCombos(ctx.duel, ctx.player, c, need).length > 0;
+}
+
+/**
+ * Advance (Tribute) Summon `c` as part of an effect. The player picks the Tributes and the zone.
+ * It does not use up the Normal Summon for the turn. `reduce` lowers the Tributes needed.
+ */
+export async function advanceSummon(ctx: EffectContext, c: CardInstance, opts: { reduce?: number } = {}): Promise<boolean> {
+  const duel = ctx.duel;
+  const p = ctx.player;
+  if (!canAdvanceSummon(ctx, c, opts.reduce ?? 0)) return false;
+  const need = Math.max(0, tributesFor(duel, c) - (opts.reduce ?? 0));
+  const chosen = await selectCombo(duel, p, tributeCombos(duel, p, c, need), `릴리스할 몬스터를 선택 (필요 ${need}장분)`);
+  if (!chosen) return false;
+  const paid = chosen.reduce((s, t) => s + releaseValue(duel, t, c), 0);
+  for (const t of chosen) duel.addLog(`${duel.cardName(t.uid, true)} 릴리스`, p);
+  if (chosen.length) duel.sendTo(chosen, 'gy', ['tribute', 'cost', 'advance'], p);
+  const zone = await duel.chooseZone(p, 'mzone', c);
+  duel.summonToField(c, p, 'tribute', 'atk', true, zone ?? undefined);
+  c.summonTributes = paid;
+  return true;
+}
+
+/** Pick a card from the deck and Set it (a Spell/Trap card) into the Spell & Trap Zone. */
+export async function searchAndSet(ctx: EffectContext, filter: (c: CardInstance) => boolean, prompt = '세트할 카드를 선택'): Promise<CardInstance | undefined> {
+  const cands = ctx.cards(ctx.player, ['deck'], (c) => c.def.category !== 'monster' && filter(c));
+  if (cands.length === 0 || ctx.duel.freeSZones(ctx.player) === 0) return undefined;
+  const [c] = await ctx.select(cands, { prompt, purpose: 'benefit' });
+  if (!c) return undefined;
+  const ok = await ctx.setSpellTrap(c);
+  ctx.duel.shuffle(ctx.duel.players[ctx.player].deck);
+  return ok ? c : undefined;
 }

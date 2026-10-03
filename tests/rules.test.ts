@@ -3,7 +3,7 @@ import { find, optionIndex, scenario } from './harness';
 import type { Request } from '../src/engine/types';
 import { tributesNeeded } from '../src/engine/flow';
 import { getCard } from '../src/cards/pool';
-import { STARTER_DECKS, validateDeck, decodeDeck, encodeDeck, expand } from '../src/deck/deck';
+import { STARTER_DECKS, validateDeck, decodeDeck, encodeDeck, expand, withNewStarters } from '../src/deck/deck';
 
 const uidOf = (duel: { cards: { uid: number; def: { id: string } }[] }, id: string) => duel.cards.find((c) => c.def.id === id)!.uid;
 
@@ -25,6 +25,24 @@ describe('deck construction', () => {
     const d = STARTER_DECKS[2];
     expect(decodeDeck(encodeDeck(d))).toEqual(d);
     expect(decodeDeck('not a code')).toBeNull();
+  });
+
+  it('offers new starter decks to returning players once, without bringing back renamed ones', () => {
+    // First visit: everything is offered.
+    const first = withNewStarters([], null);
+    expect(first.decks).toHaveLength(STARTER_DECKS.length);
+    expect(first.decks.every((d) => d.name.startsWith('내 '))).toBe(true);
+
+    // A returning player from before the builder tracked this: only the newer starters are added.
+    const legacy = STARTER_DECKS.slice(0, 4).map((d, i) => ({ name: i === 0 ? '내가 이름 바꾼 덱' : d.name.replace('[스타터] ', '내 '), main: [...d.main], extra: [...d.extra] }));
+    const second = withNewStarters(legacy, null);
+    expect(second.decks).toHaveLength(legacy.length + STARTER_DECKS.length - 4);
+    expect(second.decks.slice(4).map((d) => d.name)).toEqual(STARTER_DECKS.slice(4).map((d) => d.name.replace('[스타터] ', '내 ')));
+    expect(second.decks.some((d) => d.name === '내 엠버윙 싱크로')).toBe(false); // the renamed deck did not come back
+
+    // Running it again changes nothing, even if the player deleted one.
+    const third = withNewStarters(second.decks.slice(0, -1), second.seeded);
+    expect(third.decks).toHaveLength(second.decks.length - 1);
   });
 
   it('computes tribute requirements', () => {

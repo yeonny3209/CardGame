@@ -49,6 +49,7 @@ export type Flag =
   | 'cannotAttack'
   | 'directAttack'
   | 'doubleAttack'
+  | 'trapSetTurn' // a Set Trap card may be activated the turn it was Set
   | 'negated'; // effects are negated
 
 export type CardFilter = (duel: Duel, card: CardInstance) => boolean;
@@ -118,6 +119,12 @@ export interface ContinuousSpec {
   atk?: number | ((duel: Duel, self: CardInstance, target: CardInstance) => number);
   def?: number | ((duel: Duel, self: CardInstance, target: CardInstance) => number);
   flags?: Flag[];
+  /** Tributes the Tribute Summon of `target` needs change by this much (negative = fewer). Does not stack. */
+  tributes?: (duel: Duel, self: CardInstance, target: CardInstance) => number;
+  /** How many Tributes `self` counts as when released for the Tribute Summon of `summoned` (default 1). */
+  releaseValue?: (duel: Duel, self: CardInstance, summoned: CardInstance) => number;
+  /** Additional Normal Summons / Sets its controller may make each turn. */
+  extraNormalSummons?: number;
 }
 
 export interface EffectDef {
@@ -139,6 +146,8 @@ export interface EffectDef {
   /** Can be activated during the Damage Step. */
   damageStep?: boolean;
   condition?: (ctx: EffectContext) => boolean;
+  /** Trap cards only: when this returns true the card may be activated from the hand without being Set. */
+  fromHand?: (ctx: EffectContext) => boolean;
   cost?: CostSpec;
   target?: TargetSpec;
   resolve?: (ctx: EffectContext) => Promise<void>;
@@ -176,6 +185,8 @@ export interface CardInstance {
   positionChangedTurn: number;
   attacksThisTurn: number;
   overlay: number[];
+  /** Tributes (counting each Tribute's value) paid for this card's Tribute Summon; 0 if it was not one. */
+  summonTributes: number;
   equippedTo: { uid: number; version: number } | null;
   buffs: Buff[];
 }

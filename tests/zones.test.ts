@@ -75,7 +75,7 @@ describe('choosing the zone', () => {
     await run(1);
     expect(asked).toHaveLength(2);
     expect(duel.players[0].mzone[1]).toBe(uidOf(duel, 'gen_azure'));
-    expect(duel.players[0].normalSummonUsed).toBe(true);
+    expect(duel.players[0].normalSummons).toBe(1);
     expect(duel.log.filter((l) => l.text.includes('일반 소환'))).toHaveLength(1);
   });
 

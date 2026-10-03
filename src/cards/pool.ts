@@ -24,6 +24,8 @@ import {
   summonedSelf,
   trap,
 } from './helpers';
+import { MEM, memoryHole } from './memoryhole';
+import { SUN, sunshine } from './sunshine';
 
 const EMBER = 'emberwing';
 const TIDE = 'tidecall';
@@ -1514,7 +1516,7 @@ const generic: CardDef[] = [
   }),
 ];
 
-export const ALL_CARDS: CardDef[] = [...emberwing, ...tidecall, ...clockwork, ...veilborn, ...generic];
+export const ALL_CARDS: CardDef[] = [...emberwing, ...tidecall, ...clockwork, ...veilborn, ...sunshine, ...memoryHole, ...generic];
 
 export const CARD_DB: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map((c) => [c.id, c]));
 
@@ -1523,6 +1525,8 @@ export const ARCHETYPE_NAMES: Record<string, string> = {
   [TIDE]: '타이드콜',
   [CLOCK]: '클락워크',
   [VEIL]: '베일본',
+  [SUN]: '선샤인',
+  [MEM]: '메모리 홀',
 };
 
 export function getCard(id: string): CardDef {

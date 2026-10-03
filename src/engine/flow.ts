@@ -2,7 +2,8 @@
 import { EffectContext, sanitizeSelection } from './context';
 import { Duel, DuelOver, HAND_LIMIT, defaultRange, isExtraDeckMonster, other, START_HAND } from './core';
 import type { PendingTrigger } from './core';
-import { combinations, selectCombo, synchroCombos, xyzCombos } from './materials';
+import { selectCombo, synchroCombos, xyzCombos } from './materials';
+import { canNormalSummon, releaseValue, tributeCombos, tributesFor } from './tribute';
 import type {
   ActionOption,
   ActivationOption,
@@ -28,12 +29,7 @@ export function effectSpeed(def: CardDef, e: EffectDef): number {
   return e.type === 'quick' ? 2 : 1;
 }
 
-export function tributesNeeded(def: CardDef): number {
-  const lv = def.level ?? 0;
-  if (lv >= 7) return 2;
-  if (lv >= 5) return 1;
-  return 0;
-}
+export { tributesNeeded } from './tribute';
 
 export function isMainPhase(phase: Phase): boolean {
   return phase === 'main1' || phase === 'main2';
@@ -90,15 +86,20 @@ export function canActivate(duel: Duel, p: PlayerId, c: CardInstance, idx: numbe
   if (e.type === 'activate') {
     if (c.def.category === 'monster') return false;
     if (c.location === 'hand') {
-      if (c.def.category === 'trap') return false;
-      if (c.def.spellKind !== 'field' && duel.freeSZones(p) === 0) return false;
-      if (c.def.spellKind === 'quickplay') {
-        if (duel.turnPlayer !== p) return false;
-      } else if (!ownMainOpen) return false;
+      if (c.def.category === 'trap') {
+        // Only Traps that say so can be activated straight from the hand.
+        if (!e.fromHand || !e.fromHand(new EffectContext(duel, c.uid, p, e, idx))) return false;
+        if (duel.freeSZones(p) === 0) return false;
+      } else {
+        if (c.def.spellKind !== 'field' && duel.freeSZones(p) === 0) return false;
+        if (c.def.spellKind === 'quickplay') {
+          if (duel.turnPlayer !== p) return false;
+        } else if (!ownMainOpen) return false;
+      }
     } else if ((c.location === 'szone' || c.location === 'fzone') && !c.faceUp) {
       const setThisTurn = c.enteredTurn === duel.turn;
       if (c.def.category === 'trap' || c.def.spellKind === 'quickplay') {
-        if (setThisTurn) return false;
+        if (setThisTurn && !(c.def.category === 'trap' && duel.hasFlag(c, 'trapSetTurn'))) return false;
       } else if (!ownMainOpen) return false;
     } else return false;
   } else {
@@ -228,11 +229,18 @@ async function resolveChain(duel: Duel): Promise<void> {
   }
 }
 
+const MAX_CHAIN = 40;
+const MAX_WINDOW_ACTIVATIONS = 60;
+
 /** Players alternately add links until both pass in succession, then the chain resolves. */
 async function chainLoop(duel: Duel): Promise<void> {
   let passes = 0;
   let p = other(duel.chain[duel.chain.length - 1].player);
   while (passes < 2) {
+    if (duel.chain.length >= MAX_CHAIN) {
+      duel.addLog(`체인이 ${MAX_CHAIN}개에 도달하여 더 이상 쌓을 수 없습니다.`);
+      break;
+    }
     const opts = activationOptions(duel, p, false);
     if (opts.length > 0) {
       const ans = await duel.ask({ type: 'chain', player: p, options: opts, prompt: chainPrompt(duel) });
@@ -351,13 +359,20 @@ export async function responseWindow(
     const tp = duel.turnPlayer;
     const start = (): [PlayerId, number] => (opts.skipTurnPlayer ? [other(tp), 1] : [tp, 0]);
     let [p, passes] = start();
+    let activations = 0;
     while (passes < 2) {
       if (duel.endBattleRequested && duel.phase === 'battle') break;
+      if (activations >= MAX_WINDOW_ACTIVATIONS) {
+        // Safety net against effects that keep re-enabling each other inside a single window.
+        duel.addLog('발동이 계속 반복되어 이 타이밍을 종료합니다.');
+        break;
+      }
       const optsList = activationOptions(duel, p, false);
       if (optsList.length > 0) {
         const ans = await duel.ask({ type: 'chain', player: p, options: optsList, prompt: chainPrompt(duel) });
         if (typeof ans === 'number' && ans >= 0 && ans < optsList.length) {
           await activate(duel, p, optsList[ans].uid, optsList[ans].effIndex);
+          activations++;
           await chainLoop(duel);
           duel.windowEvents = null;
           if (opts.triggers !== false) await processTriggers(duel);
@@ -388,24 +403,27 @@ function lastSummonEvents(duel: Duel, since: number): DuelEvent[] {
 async function normalSummon(duel: Duel, uid: number, set: boolean): Promise<boolean> {
   const p = duel.turnPlayer;
   const c = duel.card(uid);
-  const n = tributesNeeded(c.def);
+  const n = tributesFor(duel, c);
+  let paid = 0;
   if (n > 0) {
-    const combos = combinations(duel.monsters(p), n);
-    const chosen = await selectCombo(duel, p, combos, `릴리스할 몬스터 ${n}장 선택`);
+    const combos = tributeCombos(duel, p, c, n);
+    const chosen = await selectCombo(duel, p, combos, `릴리스할 몬스터를 선택 (필요 ${n}장분)`);
     if (!chosen) return false;
+    paid = chosen.reduce((s, t) => s + releaseValue(duel, t, c), 0);
     for (const t of chosen) duel.addLog(`${duel.cardName(t.uid, true)} 릴리스`, p);
-    duel.sendTo(chosen, 'gy', ['tribute', 'cost'], p);
+    duel.sendTo(chosen, 'gy', ['tribute', 'cost', 'advance'], p);
   }
   // Without tributes nothing has been paid yet, so the player may still back out here.
   const zone = await duel.chooseZone(p, 'mzone', c, n === 0);
   if (zone === null) return false;
-  duel.players[p].normalSummonUsed = true;
+  duel.players[p].normalSummons += 1;
   if (set) {
     duel.summonToField(c, p, n > 0 ? 'tribute' : 'normal', 'def', false, zone);
     c.summonType = null;
   } else {
     duel.summonToField(c, p, n > 0 ? 'tribute' : 'normal', 'atk', true, zone);
   }
+  c.summonTributes = paid;
   return true;
 }
 
@@ -454,10 +472,9 @@ export function mainActions(duel: Duel): ActionOption[] {
 
   for (const c of duel.cardsIn(p, ['hand'])) {
     if (c.def.category === 'monster') {
-      if (ps.normalSummonUsed || c.def.monsterKind === 'ritual' || isExtraDeckMonster(c.def)) continue;
-      const n = tributesNeeded(c.def);
-      if (myMonsters.length < n) continue;
-      if (duel.freeMZones(p) + n === 0) continue;
+      if (!canNormalSummon(duel, p) || c.def.monsterKind === 'ritual' || isExtraDeckMonster(c.def)) continue;
+      const n = tributesFor(duel, c);
+      if (n > 0 ? tributeCombos(duel, p, c, n).length === 0 : duel.freeMZones(p) === 0) continue;
       out.push({ kind: 'normalSummon', uid: c.uid, tributes: n });
       out.push({ kind: 'setMonster', uid: c.uid, tributes: n });
     } else {
@@ -786,7 +803,10 @@ async function runTurn(duel: Duel): Promise<void> {
   duel.turn += 1;
   duel.turnPlayer = duel.turn === 1 ? duel.firstPlayer : other(duel.turnPlayer);
   const p = duel.turnPlayer;
-  duel.players[p].normalSummonUsed = false;
+  for (const q of [0, 1] as PlayerId[]) {
+    duel.players[q].normalSummons = 0;
+    duel.players[q].extraNormalSummons = 0;
+  }
   duel.opt.clear();
   for (const c of duel.cards) c.attacksThisTurn = 0;
   duel.addLog(`===== 턴 ${duel.turn}: ${duel.names[p]} =====`, p);

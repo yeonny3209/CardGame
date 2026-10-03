@@ -207,6 +207,59 @@ export const STARTER_DECKS: Deck[] = [
       ['gen_gauntlet', 2],
     ]),
   },
+  {
+    name: '[스타터] 선샤인 어드밴스',
+    main: expand([
+      ['sun_sprite', 3],
+      ['sun_lamb', 3],
+      ['sun_herald', 3],
+      ['sun_pilgrim', 3],
+      ['sun_knight', 3],
+      ['sun_lion', 3],
+      ['sun_bird', 2],
+      ['sun_dragon', 2],
+      ['sun_altar', 3],
+      ['sun_coronation', 2],
+      ['sun_ascend', 3],
+      ['sun_shield', 3],
+      ['gen_insight', 1],
+      ['gen_starfall', 1],
+      ['gen_sentinel', 2],
+      ['gen_dove', 2],
+      ['gen_pitfall', 1],
+    ]),
+    extra: expand([
+      ['gen_gauntlet', 2],
+      ['gen_storm', 1],
+    ]),
+  },
+  {
+    name: '[스타터] 메모리 홀 함정',
+    main: expand([
+      ['mem_scribe', 3],
+      ['mem_warden', 3],
+      ['mem_archivist', 3],
+      ['mem_guard', 3],
+      ['mem_librarian', 2],
+      ['mem_banish', 3],
+      ['mem_rewind', 3],
+      ['mem_erase', 2],
+      ['mem_corridor', 3],
+      ['mem_replay', 2],
+      ['mem_abyss', 2],
+      ['mem_archive', 2],
+      ['mem_whisper', 3],
+      ['gen_insight', 1],
+      ['gen_starfall', 1],
+      ['gen_pitfall', 2],
+      ['gen_barrier', 1],
+      ['gen_edict', 1],
+    ]),
+    extra: expand([
+      ['gen_gauntlet', 2],
+      ['gen_storm', 1],
+    ]),
+  },
 ];
 
 // ---------------------------------------------------------------- sharing & storage
@@ -248,6 +301,49 @@ export function saveDecks(decks: Deck[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
   } catch {
     // Storage unavailable (private mode etc.) — decks stay in memory only.
+  }
+}
+
+// ---------------------------------------------------------------- starter decks in the deck builder
+
+const SEEDED_KEY = 'cardgame.seededStarters.v1';
+
+/** Starter decks that existed before the builder started to remember which ones it had offered. */
+const LEGACY_STARTERS = ['[스타터] 엠버윙 싱크로', '[스타터] 타이드콜 엑시즈', '[스타터] 클락워크 융합', '[스타터] 베일본 의식'];
+
+export function ownCopyOf(starter: Deck): Deck {
+  return { name: starter.name.replace('[스타터] ', '내 '), main: [...starter.main], extra: [...starter.extra] };
+}
+
+/**
+ * Add starter decks the player has not been offered yet to their saved decks. A starter is offered only once,
+ * so decks the player renamed or deleted do not come back.
+ */
+export function withNewStarters(decks: Deck[], seeded: string[] | null): { decks: Deck[]; seeded: string[] } {
+  const already = new Set(seeded ?? (decks.length > 0 ? LEGACY_STARTERS : []));
+  const out = [...decks];
+  for (const starter of STARTER_DECKS) {
+    if (!already.has(starter.name)) out.push(ownCopyOf(starter));
+    already.add(starter.name);
+  }
+  return { decks: out, seeded: [...already] };
+}
+
+export function loadSeededStarters(): string[] | null {
+  try {
+    const raw = localStorage.getItem(SEEDED_KEY);
+    const arr = raw ? JSON.parse(raw) : null;
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSeededStarters(names: string[]): void {
+  try {
+    localStorage.setItem(SEEDED_KEY, JSON.stringify(names));
+  } catch {
+    // Storage unavailable: the starters are simply offered again next time.
   }
 }
 

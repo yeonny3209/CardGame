@@ -3,7 +3,7 @@ import { ALL_CARDS, ARCHETYPE_NAMES, CARD_DB } from '../cards/pool';
 import {
   EXTRA_MAX,
   MAIN_MAX,
-  STARTER_DECKS,
+  loadSeededStarters,
   belongsInExtra,
   copyLimit,
   countCards,
@@ -11,7 +11,9 @@ import {
   encodeDeck,
   loadSavedDecks,
   saveDecks,
+  saveSeededStarters,
   validateDeck,
+  withNewStarters,
 } from '../deck/deck';
 import type { Deck } from '../deck/deck';
 import type { CardDef } from '../engine/types';
@@ -54,11 +56,10 @@ export class DeckBuilder {
     private container: HTMLElement,
     private onExit: () => void,
   ) {
-    this.decks = loadSavedDecks();
-    if (this.decks.length === 0) {
-      this.decks = STARTER_DECKS.map((d) => ({ ...d, name: d.name.replace('[스타터] ', '내 '), main: [...d.main], extra: [...d.extra] }));
-      saveDecks(this.decks);
-    }
+    const merged = withNewStarters(loadSavedDecks(), loadSeededStarters());
+    this.decks = merged.decks;
+    saveSeededStarters(merged.seeded);
+    if (this.decks.length > 0) saveDecks(this.decks);
     this.currentIndex = 0;
     this.current = this.clone(this.decks[0]);
   }
