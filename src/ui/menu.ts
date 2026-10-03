@@ -4,6 +4,7 @@ import type { Deck } from '../deck/deck';
 import { DeckBuilder } from './deckBuilder';
 import { showMessage } from './dialog';
 import { DuelScreen } from './duelView';
+import { OnlineScreen } from './onlineMenu';
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -70,11 +71,21 @@ export function showMenu(container: HTMLElement): void {
       void showMessage('사용 가능한 덱을 선택하세요.');
       return;
     }
-    new DuelScreen(container, myDeck, aiDeck, () => showMenu(container)).start();
+    new DuelScreen(container, { kind: 'ai', myDeck, aiDeck }, () => showMenu(container)).start();
   });
   const builder = h('button', 'btn big', '덱 편집');
   builder.addEventListener('click', () => new DeckBuilder(container, () => showMenu(container)).start());
-  panel.append(mine.wrap, ai.wrap, start, builder);
+  const online = h('button', 'btn big', '온라인 듀얼 (선택)');
+  online.title = '다른 기기의 친구와 1:1 대전. 인터넷이 없어도 나머지 기능은 모두 사용할 수 있습니다.';
+  online.addEventListener('click', () => {
+    try {
+      new OnlineScreen(container, decks, () => showMenu(container)).start();
+    } catch (e) {
+      console.error(e);
+      void showMessage('온라인 듀얼을 시작할 수 없습니다. AI 대전과 덱 편집은 그대로 사용할 수 있습니다.');
+    }
+  });
+  panel.append(mine.wrap, ai.wrap, start, builder, online);
   root.append(panel);
 
   const rules = h('div', 'rules');

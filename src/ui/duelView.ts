@@ -1,15 +1,15 @@
 // The duel screen: board rendering and the human player's controller.
 import { AIController } from '../ai/ai';
-import { Duel, other } from '../engine/core';
+import { Duel } from '../engine/core';
 import { runDuel } from '../engine/flow';
 import type { ActionOption, Answer, CardDef, CardInstance, Controller, PlayerId, Request } from '../engine/types';
 import type { Deck } from '../deck/deck';
 import { toDefs } from '../deck/deck';
 import { cardBack, cardFace, detailHtml, fieldCard } from './cardView';
+import type { OnlineSession } from '../net/session';
 import { askConfirm } from './dialog';
 
-const ME: PlayerId = 0;
-const AI_PLAYER: PlayerId = 1;
+export type DuelSetup = { kind: 'ai'; myDeck: Deck; aiDeck: Deck } | { kind: 'online'; session: OnlineSession; myDeck: Deck; oppDeck: Deck; seed: number };
 
 const PHASES: Array<[string, string]> = [
   ['draw', 'DP'],
@@ -103,12 +103,16 @@ export class DuelScreen {
   finished = false;
   chainMode: 'auto' | 'always' = loadChainMode();
 
+  readonly me: PlayerId;
+  readonly opp: PlayerId;
+
   constructor(
     private container: HTMLElement,
-    private myDeck: Deck,
-    private aiDeck: Deck,
+    private setup: DuelSetup,
     private onExit: () => void,
   ) {
+    this.me = setup.kind === 'online' ? setup.session.seat : 0;
+    this.opp = this.me === 0 ? 1 : 0;
     const human: Controller = {
       choose: (req) =>
         new Promise<Answer>((resolve) => {
@@ -123,15 +127,24 @@ export class DuelScreen {
           this.queueRender();
         }),
     };
-    const a = toDefs(myDeck);
-    const b = toDefs(aiDeck);
-    const ai = new AIController(AI_PLAYER, 450);
-    const aiController: Controller = {
-      choose: (req, d) => (this.finished ? new Promise<Answer>(() => {}) : ai.choose(req, d)),
-    };
-    this.duel = new Duel([a.main, b.main], [a.extra, b.extra], [human, aiController], {
-      names: ['나', 'AI'],
-    });
+    const mine = toDefs(setup.myDeck);
+    if (setup.kind === 'ai') {
+      const b = toDefs(setup.aiDeck);
+      const ai = new AIController(this.opp, 450);
+      const aiController: Controller = {
+        choose: (req, d) => (this.finished ? new Promise<Answer>(() => {}) : ai.choose(req, d)),
+      };
+      this.duel = new Duel([mine.main, b.main], [mine.extra, b.extra], [human, aiController], { names: ['나', 'AI'] });
+    } else {
+      const s = setup.session;
+      const theirs = toDefs(setup.oppDeck);
+      const decks = this.me === 0 ? [mine, theirs] : [theirs, mine];
+      const names: [string, string] = this.me === 0 ? ['나', '상대'] : ['상대', '나'];
+      this.duel = new Duel([decks[0].main, decks[1].main], [decks[0].extra, decks[1].extra], s.controllers(human), { seed: setup.seed, names });
+      s.onSurrender = () => this.endOnline(this.me, '상대가 항복했습니다.');
+      s.onClose = () => this.endOnline(this.me, '상대와의 연결이 끊어졌습니다.');
+      s.onDesync = () => this.endOnline(null, '두 사람의 게임 상태가 어긋나 듀얼을 중단했습니다.');
+    }
     this.duel.listeners.push(() => this.queueRender());
     this.root = h('div', 'duel');
     container.replaceChildren(this.root);
@@ -166,13 +179,26 @@ export class DuelScreen {
     if (d.windowEvents?.some((e) => e.type === 'summoned' || e.type === 'attackDeclared')) return true;
     if (d.damageStep !== null && d.damageStep !== 'end' && d.damageStep !== 'afterCalc') return true;
     // Give a chance at the opponent's End Phase (the classic moment to use set cards).
-    if (d.phase === 'end' && d.turnPlayer !== ME && d.windowEvents?.some((e) => e.type === 'phaseStart')) return true;
+    if (d.phase === 'end' && d.turnPlayer !== this.me && d.windowEvents?.some((e) => e.type === 'phaseStart')) return true;
     return false;
   }
 
-  private surrender(): void {
+  /** An online duel that ends outside the engine: surrender, disconnect or a state mismatch. */
+  private endOnline(winner: PlayerId | null, reason: string): void {
+    if (this.finished) return;
     const d = this.duel;
-    d.winner = AI_PLAYER;
+    d.winner = winner;
+    d.endReason = reason;
+    d.addLog(reason);
+    this.finished = true;
+    this.pending = null;
+    this.render();
+  }
+
+  private surrender(): void {
+    if (this.setup.kind === 'online') this.setup.session.surrender();
+    const d = this.duel;
+    d.winner = this.opp;
     d.endReason = '항복했습니다.';
     d.addLog(d.endReason);
     this.finished = true;
@@ -253,15 +279,15 @@ export class DuelScreen {
     side.append(tools, detail, this.renderLog());
 
     const board = h('main', 'board');
-    board.append(this.renderHand(AI_PLAYER, opts));
-    board.append(this.renderRow(AI_PLAYER, 'st', opts));
-    board.append(this.renderRow(AI_PLAYER, 'mz', opts));
+    board.append(this.renderHand(this.opp, opts));
+    board.append(this.renderRow(this.opp, 'st', opts));
+    board.append(this.renderRow(this.opp, 'mz', opts));
     board.append(this.renderMidbar());
     const prompt = this.renderPrompt();
     if (prompt) board.append(prompt);
-    board.append(this.renderRow(ME, 'mz', opts));
-    board.append(this.renderRow(ME, 'st', opts));
-    board.append(this.renderHand(ME, opts));
+    board.append(this.renderRow(this.me, 'mz', opts));
+    board.append(this.renderRow(this.me, 'st', opts));
+    board.append(this.renderHand(this.me, opts));
 
     root.append(board, side);
     if (this.popup) root.append(this.renderPopup(opts));
@@ -271,7 +297,7 @@ export class DuelScreen {
   }
 
   private canSee(c: CardInstance): boolean {
-    return c.controller === ME || c.faceUp || c.location === 'gy' || c.location === 'banished';
+    return c.controller === this.me || c.faceUp || c.location === 'gy' || c.location === 'banished';
   }
 
   /** Update the side panel and, when a card list dialog is open, its own detail pane. */
@@ -317,11 +343,11 @@ export class DuelScreen {
   }
 
   private renderHand(p: PlayerId, opts: Map<number, number[]>): HTMLElement {
-    const row = h('div', `hand ${p === ME ? 'me' : 'opp'}`);
+    const row = h('div', `hand ${p === this.me ? 'me' : 'opp'}`);
     for (const uid of this.duel.players[p].hand) {
       const c = this.duel.card(uid);
-      const elm = p === ME ? cardFace(c.def, { small: true }) : cardBack(true);
-      if (p === ME) this.bindCard(elm, c, opts);
+      const elm = p === this.me ? cardFace(c.def, { small: true }) : cardBack(true);
+      if (p === this.me) this.bindCard(elm, c, opts);
       row.append(elm);
     }
     return row;
@@ -344,7 +370,7 @@ export class DuelScreen {
       if (actionable) cell.classList.add('actionable');
       cell.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (loc === 'extra' && p !== ME) return;
+        if (loc === 'extra' && p !== this.me) return;
         this.pileView = { player: p, loc };
         this.render();
       });
@@ -356,7 +382,7 @@ export class DuelScreen {
   private renderRow(p: PlayerId, kind: 'mz' | 'st', opts: Map<number, number[]>): HTMLElement {
     const d = this.duel;
     const ps = d.players[p];
-    const row = h('div', `row ${kind} ${p === ME ? 'me' : 'opp'}`);
+    const row = h('div', `row ${kind} ${p === this.me ? 'me' : 'opp'}`);
     const zones = kind === 'mz' ? ps.mzone : ps.szone;
     const cells: HTMLElement[] = [];
     if (kind === 'mz') {
@@ -364,7 +390,7 @@ export class DuelScreen {
       f.append(h('span', 'zone-label', '필드'));
       if (ps.fzone !== null) {
         const c = d.card(ps.fzone);
-        const elm = fieldCard(d, c, ME);
+        const elm = fieldCard(d, c, this.me);
         this.bindCard(elm, c, opts);
         f.append(elm);
       }
@@ -372,7 +398,7 @@ export class DuelScreen {
     } else cells.push(this.pile(p, 'extra', opts));
     const zreq = this.pending?.req.type === 'zone' ? this.pending.req : null;
     const pickable = (i: number) =>
-      p === ME && zreq !== null && zreq.kind === (kind === 'mz' ? 'mzone' : 'szone') && zreq.free.includes(i);
+      p === this.me && zreq !== null && zreq.kind === (kind === 'mz' ? 'mzone' : 'szone') && zreq.free.includes(i);
     zones.forEach((uid, zi) => {
       const z = h('div', `zone ${kind === 'mz' ? 'mzone' : 'szone'}`);
       if (pickable(zi)) {
@@ -385,7 +411,7 @@ export class DuelScreen {
       }
       if (uid !== null) {
         const c = d.card(uid);
-        const elm = fieldCard(d, c, ME);
+        const elm = fieldCard(d, c, this.me);
         if (d.battle && (d.battle.attacker === uid || d.battle.target === uid)) elm.classList.add('in-battle');
         if (d.chain.some((l) => l.uid === uid)) elm.classList.add('chaining');
         if (d.chain.some((l) => l.targets.some((t) => t.uid === uid))) elm.classList.add('targeted');
@@ -402,7 +428,7 @@ export class DuelScreen {
       cells.push(h('div', 'zone empty-slot'));
     }
     // Mirror the opponent's side like a real table.
-    if (p !== ME) cells.reverse();
+    if (p !== this.me) cells.reverse();
     row.append(...cells);
     return row;
   }
@@ -411,7 +437,7 @@ export class DuelScreen {
     const d = this.duel;
     const bar = h('div', 'midbar');
     const lp = (p: PlayerId) => {
-      const box = h('div', `lp ${p === ME ? 'me' : 'opp'}${d.turnPlayer === p ? ' active' : ''}`);
+      const box = h('div', `lp ${p === this.me ? 'me' : 'opp'}${d.turnPlayer === p ? ' active' : ''}`);
       box.append(h('span', 'lp-name', d.names[p]), h('span', 'lp-value', String(d.players[p].lp)));
       return box;
     };
@@ -422,11 +448,11 @@ export class DuelScreen {
       phases.append(chip);
     }
     if (d.damageStep) phases.append(h('span', 'step', '데미지 스텝'));
-    bar.append(lp(AI_PLAYER), phases, lp(ME));
+    bar.append(lp(this.opp), phases, lp(this.me));
     if (d.chain.length) {
       const ch = h('div', 'chain');
       for (const l of d.chain) {
-        const item = h('div', `link ${l.player === ME ? 'me' : 'opp'}`, `체인 ${l.index}: ${d.card(l.uid).def.name} — ${l.effect.label}`);
+        const item = h('div', `link ${l.player === this.me ? 'me' : 'opp'}`, `체인 ${l.index}: ${d.card(l.uid).def.name} — ${l.effect.label}`);
         ch.append(item);
       }
       bar.append(ch);
@@ -438,7 +464,7 @@ export class DuelScreen {
     const box = h('div', 'log');
     const entries = this.duel.log.slice(-150);
     for (const e of entries) {
-      const line = h('div', `log-line${e.player === ME ? ' me' : e.player === AI_PLAYER ? ' opp' : ''}${e.text.startsWith('=====') ? ' turn' : ''}`, e.text);
+      const line = h('div', `log-line${e.player === this.me ? ' me' : e.player === this.opp ? ' opp' : ''}${e.text.startsWith('=====') ? ' turn' : ''}`, e.text);
       box.append(line);
     }
     requestAnimationFrame(() => (box.scrollTop = box.scrollHeight));
@@ -469,7 +495,7 @@ export class DuelScreen {
     if (!p) {
       if (this.finished) return null;
       const w = h('div', 'prompt waiting');
-      w.append(h('div', 'prompt-text', this.duel.turnPlayer === ME ? '처리 중…' : '상대가 행동 중…'));
+      w.append(h('div', 'prompt-text', this.duel.turnPlayer === this.me ? '처리 중…' : '상대가 행동 중…'));
       return w;
     }
     const req = p.req;
@@ -592,12 +618,12 @@ export class DuelScreen {
     for (const uid of req.candidates) {
       const c = d.card(uid);
       const wrap = h('div', 'choice');
-      const visible = c.faceUp || c.owner === ME || c.location === 'gy' || c.location === 'banished';
+      const visible = c.faceUp || c.owner === this.me || c.location === 'gy' || c.location === 'banished';
       const face = visible
         ? cardFace(c.def, { small: true, stats: c.location === 'mzone' && c.faceUp ? { atk: d.atk(c), def: d.defense(c) } : undefined })
         : cardBack(true);
       face.addEventListener('mouseenter', () => this.showDetail(c));
-      const owner = c.controller === ME ? '나' : '상대';
+      const owner = c.controller === this.me ? '나' : '상대';
       wrap.append(face, h('div', 'choice-label', `${owner} · ${LOC_LABEL[c.location]}`));
       if (this.selection.has(uid)) wrap.classList.add('chosen');
       wrap.addEventListener('click', () => {
@@ -635,16 +661,20 @@ export class DuelScreen {
     const d = this.duel;
     const overlay = h('div', 'modal-backdrop result');
     const modal = h('div', 'modal');
-    const title = d.winner === ME ? '승리!' : d.winner === other(ME) ? '패배' : '무승부';
-    modal.append(h('h2', `result-title ${d.winner === ME ? 'win' : 'lose'}`, title), h('p', '', d.endReason));
+    const title = d.winner === this.me ? '승리!' : d.winner === this.opp ? '패배' : '무승부';
+    modal.append(h('h2', `result-title ${d.winner === this.me ? 'win' : 'lose'}`, title), h('p', '', d.endReason));
     const buttons = h('div', 'prompt-buttons');
     const again = h('button', 'btn primary', '다시 하기');
-    again.addEventListener('click', () => new DuelScreen(this.container, this.myDeck, this.aiDeck, this.onExit).start());
+    again.addEventListener('click', () => new DuelScreen(this.container, this.setup, this.onExit).start());
     const back = h('button', 'btn', '메뉴로');
-    back.addEventListener('click', () => this.onExit());
+    back.addEventListener('click', () => {
+      if (this.setup.kind === 'online') this.setup.session.close();
+      this.onExit();
+    });
     const view = h('button', 'btn ghost', '필드 보기');
     view.addEventListener('click', () => overlay.remove());
-    buttons.append(again, back, view);
+    if (this.setup.kind === 'ai') buttons.append(again);
+    buttons.append(back, view);
     modal.append(buttons);
     overlay.append(modal);
     return overlay;

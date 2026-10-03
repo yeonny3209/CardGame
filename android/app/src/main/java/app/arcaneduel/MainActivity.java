@@ -25,7 +25,8 @@ import java.util.Map;
  *
  * The page is loaded from a virtual https origin instead of file:// so ES modules and localStorage
  * (saved decks) behave like on a normal website. Every request to that origin is answered from the
- * assets; every other request is blocked. The app declares no INTERNET permission.
+ * assets; every other HTTP request is blocked. The INTERNET permission is only for the optional online duel,
+ * which uses a direct WebRTC data channel (not an HTTP request) between two players.
  */
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";

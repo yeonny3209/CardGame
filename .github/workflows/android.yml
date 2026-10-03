@@ -50,9 +50,9 @@ jobs:
           "$BT/apksigner" verify --verbose --print-certs "$APK"
           echo "== manifest =="
           "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion|application-label|launchable-activity|uses-permission)" || true
-          echo "== permissions (none expected: the app is fully offline) =="
+          echo "== permissions (only INTERNET, for the optional online duel) =="
           "$BT/aapt2" dump permissions "$APK"
-          if "$BT/aapt2" dump permissions "$APK" | grep -q "uses-permission"; then echo "unexpected permission"; exit 1; fi
+          if "$BT/aapt2" dump permissions "$APK" | grep "uses-permission" | grep -v "android.permission.INTERNET"; then echo "unexpected permission"; exit 1; fi
           echo "== bundled game =="
           unzip -l "$APK" | grep -E "assets/www/(index.html|assets/)"
           cp "$APK" ArcaneDuel.apk

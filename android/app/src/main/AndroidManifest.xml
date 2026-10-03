@@ -2,9 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-        No INTERNET permission on purpose: the whole game ships inside the APK and runs offline,
-        and the app cannot reach the network even by accident.
+        INTERNET is used only by the optional online duel (a direct WebRTC connection to the other player).
+        The whole game still ships inside the APK: AI duels and the deck builder work without a network, and the
+        WebView still blocks every HTTP request that is not served from the app's own assets.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
