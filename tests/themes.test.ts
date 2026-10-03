@@ -35,9 +35,9 @@ describe('선샤인: tributes', () => {
     };
     const herald = { id: 'sun_herald', loc: 'mzone' as const };
     const altar = { id: 'sun_altar', loc: 'fzone' as const };
-    expect(need('sun_bird', [])).toBe(2);
-    expect(need('sun_bird', [herald])).toBe(1);
-    expect(need('sun_bird', [herald, altar])).toBe(1); // 2 - 1, not 2 - 2
+    expect(need('sun_dragon', [])).toBe(2);
+    expect(need('sun_dragon', [herald])).toBe(1);
+    expect(need('sun_dragon', [herald, altar])).toBe(1); // 2 - 1, not 2 - 2
     expect(need('sun_knight', [altar])).toBe(0);
     expect(need('gen_ogre', [herald, altar])).toBe(1); // not a Sunshine monster
     expect(need('sun_sprite', [herald, altar])).toBe(0); // Level 2: nothing to reduce
@@ -45,19 +45,19 @@ describe('선샤인: tributes', () => {
 
   it('a Sunshine Pilgrim counts as two Tributes for Sunshine monsters only', async () => {
     const seen: number[] = [];
-    const { duel, run } = scenario(0, [{ hand: ['sun_bird', 'gen_elder'], field: [{ id: 'sun_pilgrim', loc: 'mzone' }] }, {}], [
+    const { duel, run } = scenario(0, [{ hand: ['sun_dragon', 'gen_elder'], field: [{ id: 'sun_pilgrim', loc: 'mzone' }] }, {}], [
       (req, d) => {
         if (req.type !== 'action') return undefined;
         const elder = optionIndex(req, (o) => normalOpt(o as ActionOption, uidOf(d, 'gen_elder')));
         seen.push(elder);
-        const i = optionIndex(req, (o) => normalOpt(o as ActionOption, uidOf(d, 'sun_bird')));
+        const i = optionIndex(req, (o) => normalOpt(o as ActionOption, uidOf(d, 'sun_dragon')));
         return i >= 0 ? i : undefined;
       },
       () => undefined,
     ]);
     await run(1);
     expect(seen[0]).toBe(-1); // a Level 8 non-Sunshine needs two real Tributes
-    const bird = find(duel, 'sun_bird', 0)[0];
+    const bird = find(duel, 'sun_dragon', 0)[0];
     expect(bird.location).toBe('mzone');
     expect(bird.summonTributes).toBe(2);
     expect(find(duel, 'sun_pilgrim', 0)[0].location).toBe('gy');
@@ -66,11 +66,11 @@ describe('선샤인: tributes', () => {
   it('Sunshine Lamb draws when it is released for an Advance Summon', async () => {
     const { duel, run } = scenario(
       0,
-      [{ hand: ['sun_bird'], field: [{ id: 'sun_lamb', loc: 'mzone' }, { id: 'clock_sentry', loc: 'mzone' }] }, {}],
+      [{ hand: ['sun_dragon'], field: [{ id: 'sun_lamb', loc: 'mzone' }, { id: 'clock_sentry', loc: 'mzone' }] }, {}],
       [
         (req, d) => {
           if (req.type === 'action') {
-            const i = optionIndex(req, (o) => normalOpt(o as ActionOption, uidOf(d, 'sun_bird')));
+            const i = optionIndex(req, (o) => normalOpt(o as ActionOption, uidOf(d, 'sun_dragon')));
             return i >= 0 ? i : undefined;
           }
           if (req.type === 'yesno') return req.prompt.includes('어린 양');
@@ -80,7 +80,7 @@ describe('선샤인: tributes', () => {
       ],
     );
     await run(1);
-    expect(find(duel, 'sun_bird', 0)[0].location).toBe('mzone');
+    expect(find(duel, 'sun_dragon', 0)[0].location).toBe('mzone');
     expect(find(duel, 'sun_lamb', 0)[0].location).toBe('gy');
     expect(duel.log.some((l) => l.text.includes('「선샤인 어린 양」') && l.text.includes('발동'))).toBe(true);
     expect(duel.players[0].hand).toHaveLength(5); // 5 - Bird + 1 draw
@@ -138,7 +138,7 @@ describe('선샤인: extra summons', () => {
   it('Ascension Advance Summons without using up the Normal Summon', async () => {
     const { duel, run } = scenario(
       0,
-      [{ hand: ['sun_ascend', 'sun_bird', 'gen_azure'], field: [{ id: 'sun_sprite', loc: 'mzone' }] }, {}],
+      [{ hand: ['sun_ascend', 'sun_dragon', 'gen_azure'], field: [{ id: 'sun_sprite', loc: 'mzone' }] }, {}],
       [
         (req, d) => {
           if (req.type === 'action') {
@@ -152,7 +152,7 @@ describe('선샤인: extra summons', () => {
       ],
     );
     await run(1);
-    const bird = find(duel, 'sun_bird', 0)[0];
+    const bird = find(duel, 'sun_dragon', 0)[0];
     expect(bird.location).toBe('mzone');
     expect(bird.summonType).toBe('tribute');
     expect(bird.summonTributes).toBe(1); // 2 - 1

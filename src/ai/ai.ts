@@ -128,7 +128,10 @@ function scoreAction(duel: Duel, me: PlayerId, o: ActionOption): number {
       const c = duel.card(o.uid);
       const combos = o.method === 'synchro' ? synchroCombos(duel, c.def, duel.monsters(me)) : xyzCombos(duel, c.def, duel.monsters(me));
       const best = Math.min(...combos.map((m) => Math.max(...m.map((x) => visibleAtk(duel, x)))));
-      return (c.def.atk ?? 0) > best + 200 ? 65 + (c.def.atk ?? 0) / 1000 : -1;
+      const atk = c.def.atk ?? 0;
+      // The monster's effect is worth a summon even when its stats alone barely beat the materials.
+      const worthIt = atk > best + 200 || (c.def.effects.length > 0 && atk >= best);
+      return worthIt ? 65 + atk / 1000 + (hasSummonTrigger(c) ? 10 : 0) : -1;
     }
     case 'normalSummon': {
       const c = duel.card(o.uid);

@@ -25,6 +25,7 @@ import {
   trap,
 } from './helpers';
 import { MEM, memoryHole } from './memoryhole';
+import { staples } from './staples';
 import { SUN, sunshine } from './sunshine';
 
 const EMBER = 'emberwing';
@@ -73,6 +74,7 @@ const emberwing: CardDef[] = [
     level: 2,
     atk: 800,
     def: 400,
+    tuner: true,
     archetypes: [EMBER],
     text: '①: 자신 필드에 앞면 표시의 「엠버윙」 몬스터가 존재할 경우, 이 카드는 패에서 특수 소환할 수 있다. 「엠버윙 새끼새」의 ①의 방법에 의한 특수 소환은 1턴에 1번밖에 할 수 없다.',
     effects: [handProcedure('패에서 특수 소환', (ctx) => ctx.faceUpMonsters(ctx.player, (c) => inArch(c, EMBER)).length > 0)],
@@ -611,17 +613,18 @@ const clockwork: CardDef[] = [
     atk: 1000,
     def: 1400,
     archetypes: [CLOCK],
-    text: '①: 이 카드가 일반 소환에 성공했을 경우에 발동할 수 있다. 덱에서 「클락워크 퓨전」 1장을 패에 넣는다. 「클락워크 팅커」의 ①의 효과는 1턴에 1번밖에 사용할 수 없다.',
+    text: '①: 이 카드가 일반 소환에 성공했을 경우에 발동할 수 있다. 덱에서 「클락워크 퓨전」 1장을 패에 넣는다. 그 후, 패를 1장 버린다. 「클락워크 팅커」의 ①의 효과는 1턴에 1번밖에 사용할 수 없다.',
     effects: [
       {
-        label: '「클락워크 퓨전」 서치',
+        label: '「클락워크 퓨전」 서치 후 1장 버림',
         type: 'trigger',
         event: 'summoned',
         eventFilter: summonedSelf('normal'),
         opt: 'hard',
         condition: (ctx) => ctx.cards(ctx.player, ['deck'], (c) => c.def.id === 'clock_fusion').length > 0,
         resolve: async (ctx) => {
-          await ctx.search((c) => c.def.id === 'clock_fusion');
+          // Card-neutral: the Fusion Spell comes at the price of a card from the hand.
+          if (await ctx.search((c) => c.def.id === 'clock_fusion')) await ctx.discard(1);
         },
       },
     ],
@@ -705,7 +708,7 @@ const clockwork: CardDef[] = [
     attribute: 'EARTH',
     race: 'Machine',
     level: 8,
-    atk: 2900,
+    atk: 2800,
     def: 2400,
     archetypes: [CLOCK],
     materials: {
@@ -744,19 +747,21 @@ const clockwork: CardDef[] = [
     materials: {
       type: 'fusion',
       materials: [
-        { desc: '기계족 몬스터', filter: (_d, c) => c.def.race === 'Machine' },
+        { desc: '「클락워크」 몬스터', filter: (_d, c) => inArch(c, CLOCK) },
         { desc: '기계족 몬스터', filter: (_d, c) => c.def.race === 'Machine' },
       ],
     },
-    text: '기계족 몬스터 × 2\n①: 이 카드는 상대의 효과의 대상이 되지 않는다.\n②: 이 카드의 공격력은 자신 묘지의 기계족 몬스터의 수 × 200 올린다.',
+    text:
+      '「클락워크」 몬스터 + 기계족 몬스터\n①: 이 카드는 상대의 효과의 대상이 되지 않는다.\n' +
+      '②: 이 카드의 공격력은 자신 묘지의 기계족 몬스터의 수 × 200 올린다. 이 효과로 올라가는 수치는 최대 800까지이다.',
     effects: [
       selfFlag('대상 내성', 'untargetable'),
       {
-        label: '묘지의 기계족 × 200',
+        label: '묘지의 기계족 × 200 (최대 800)',
         type: 'continuous',
         continuous: {
           affects: (_d, self, t) => self.uid === t.uid,
-          atk: (d, self) => d.cardsIn(self.controller, ['gy'], (c) => c.def.race === 'Machine').length * 200,
+          atk: (d, self) => Math.min(800, d.cardsIn(self.controller, ['gy'], (c) => c.def.race === 'Machine').length * 200),
         },
       },
     ],
@@ -766,8 +771,8 @@ const clockwork: CardDef[] = [
     name: '클락워크 퓨전',
     kind: 'normal',
     archetypes: [CLOCK],
-    text: '①: 자신의 패·필드에서 융합 소재 몬스터를 묘지로 보내고, 「클락워크」 융합 몬스터 1장을 엑스트라 덱에서 융합 소환한다.',
-    effects: [fusionActivation('「클락워크」 융합 소환', (c) => inArch(c, CLOCK))],
+    text: '「클락워크 퓨전」은 1턴에 1장밖에 발동할 수 없다.\n①: 자신의 패·필드에서 융합 소재 몬스터를 묘지로 보내고, 「클락워크」 융합 몬스터 1장을 엑스트라 덱에서 융합 소환한다.',
+    effects: [{ ...fusionActivation('「클락워크」 융합 소환', (c) => inArch(c, CLOCK)), opt: 'hard' }],
   }),
   spell({
     id: 'clock_rewind',
@@ -959,8 +964,8 @@ const veilborn: CardDef[] = [
     name: '베일본 레퀴엠',
     kind: 'ritual',
     archetypes: [VEIL],
-    text: '「베일본 리치 퀸」의 의식 소환에 필요.\n①: 자신의 패·필드에서 레벨의 합계가 8 이상이 되도록 몬스터를 릴리스하고, 패에서 「베일본 리치 퀸」을 의식 소환한다.',
-    effects: [ritualActivation('「베일본 리치 퀸」 의식 소환', 'veil_lich')],
+    text: '「베일본 리치 퀸」의 의식 소환에 필요.\n①: 자신의 패·필드의 몬스터를 릴리스하거나, 자신 묘지의 「베일본」 몬스터를 제외하고, 레벨의 합계가 8 이상이 되도록 하여, 패에서 「베일본 리치 퀸」을 의식 소환한다.',
+    effects: [ritualActivation('「베일본 리치 퀸」 의식 소환', 'veil_lich', (c) => inArch(c, VEIL))],
   }),
   spell({
     id: 'veil_rebirth',
@@ -1516,7 +1521,7 @@ const generic: CardDef[] = [
   }),
 ];
 
-export const ALL_CARDS: CardDef[] = [...emberwing, ...tidecall, ...clockwork, ...veilborn, ...sunshine, ...memoryHole, ...generic];
+export const ALL_CARDS: CardDef[] = [...emberwing, ...tidecall, ...clockwork, ...veilborn, ...sunshine, ...memoryHole, ...generic, ...staples];
 
 export const CARD_DB: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map((c) => [c.id, c]));
 

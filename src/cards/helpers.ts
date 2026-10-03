@@ -188,12 +188,15 @@ export function fusionActivation(label: string, filter?: (c: CardInstance) => bo
   };
 }
 
-function ritualTargets(ctx: EffectContext, ritualId: string) {
+function ritualTargets(ctx: EffectContext, ritualId: string, gyFilter?: (c: CardInstance) => boolean) {
   const free = ctx.duel.freeMZones(ctx.player);
   return ctx
     .cards(ctx.player, ['hand'], (c) => c.def.id === ritualId)
     .map((r) => {
-      const pool = ctx.cards(ctx.player, ['hand', 'mzone'], (c) => c.uid !== r.uid && isMonster(c));
+      const pool = [
+        ...ctx.cards(ctx.player, ['hand', 'mzone'], (c) => c.uid !== r.uid && isMonster(c)),
+        ...(gyFilter ? ctx.cards(ctx.player, ['gy'], (c) => isMonster(c) && gyFilter(c)) : []),
+      ];
       const combos = ritualCombos(ctx.duel, r.def.level ?? 0, pool).filter(
         (combo) => free + combo.filter((m) => m.location === 'mzone').length > 0,
       );
@@ -202,23 +205,34 @@ function ritualTargets(ctx: EffectContext, ritualId: string) {
     .filter((x) => x.combos.length > 0);
 }
 
-/** Ritual Spell: Ritual Summon `ritualId` by Tributing monsters whose total Levels equal or exceed its Level. */
-export function ritualActivation(label: string, ritualId: string): EffectDef {
+/**
+ * Ritual Spell: Ritual Summon `ritualId` by Tributing monsters whose total Levels equal or exceed its Level.
+ * With `gyFilter`, matching monsters in the GY can be banished as materials too.
+ */
+export function ritualActivation(label: string, ritualId: string, gyFilter?: (c: CardInstance) => boolean): EffectDef {
   return {
     label,
     type: 'activate',
-    condition: (ctx) => ritualTargets(ctx, ritualId).length > 0,
+    condition: (ctx) => ritualTargets(ctx, ritualId, gyFilter).length > 0,
     resolve: async (ctx) => {
-      const options = ritualTargets(ctx, ritualId);
+      const options = ritualTargets(ctx, ritualId, gyFilter);
       const [r] = await ctx.select(
         options.map((o) => o.card),
         { prompt: '의식 소환할 몬스터', purpose: 'benefit' },
       );
       if (!r) return;
-      const mats = await selectCombo(ctx.duel, ctx.player, options.find((o) => o.card === r)!.combos, '의식 소환을 위해 릴리스할 몬스터');
+      const mats = await selectCombo(ctx.duel, ctx.player, options.find((o) => o.card === r)!.combos, '의식 소환의 소재로 쓸 몬스터');
       if (!mats) return;
-      ctx.duel.addLog(`릴리스: ${mats.map((m) => ctx.duel.cardName(m.uid, true)).join(', ')}`, ctx.player);
-      ctx.duel.sendTo(mats, 'gy', ['tribute', 'material', 'ritual'], ctx.player);
+      const fromGy = mats.filter((m) => m.location === 'gy');
+      const released = mats.filter((m) => m.location !== 'gy');
+      if (released.length) {
+        ctx.duel.addLog(`릴리스: ${released.map((m) => ctx.duel.cardName(m.uid, true)).join(', ')}`, ctx.player);
+        ctx.duel.sendTo(released, 'gy', ['tribute', 'material', 'ritual'], ctx.player);
+      }
+      if (fromGy.length) {
+        ctx.duel.addLog(`묘지에서 제외: ${fromGy.map((m) => ctx.duel.cardName(m.uid, true)).join(', ')}`, ctx.player);
+        ctx.duel.sendTo(fromGy, 'banished', ['material', 'ritual'], ctx.player);
+      }
       await ctx.specialSummon(r, { type: 'ritual' });
     },
   };

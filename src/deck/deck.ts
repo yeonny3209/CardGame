@@ -14,15 +14,30 @@ export const MAIN_MAX = 60;
 export const EXTRA_MAX = 15;
 export const MAX_COPIES = 3;
 
-/** Forbidden (0), Limited (1), Semi-Limited (2). */
+/**
+ * Forbidden (0), Limited (1), Semi-Limited (2), in the spirit of the OCG list in the middle of the 9th generation
+ * (2018-2019). The cards are original, so each one follows the real card it plays like (see docs/BALANCE.md).
+ */
 export const BANLIST: Record<string, 0 | 1 | 2> = {
-  gen_cataclysm: 0,
-  gen_insight: 1,
-  gen_starfall: 1,
-  gen_seconddawn: 1,
-  gen_barrier: 1,
-  gen_edict: 1,
-  gen_whirlwind: 2,
+  // Forbidden: free card advantage and unconditional mass removal.
+  gen_insight: 0, // Pot of Greed
+  gen_cataclysm: 0, // Raigeki / Dark Hole
+  // Limited: unconditional revival, answers that stop everything, powerful once-a-duel effects.
+  gen_seconddawn: 1, // Monster Reborn
+  gen_edict: 1, // Solemn Judgment
+  gen_barrier: 1, // Torrential Tribute
+  gen_thunder: 1, // Lightning Storm
+  gen_twisters: 1, // Twin Twisters
+  gen_prison: 1, // Dimensional Prison
+  gen_hunter: 1, // Sangan
+  // Semi-Limited: flexible removal, search and recovery.
+  gen_whirlwind: 2, // Mystical Space Typhoon
+  gen_starfall: 2, // Smashing Ground
+  gen_exchange: 2, // Graceful Charity (weaker)
+  gen_reincarnation: 2, // Monster Reincarnation
+  gen_chalice: 2, // Forbidden Chalice
+  gen_bottomless: 2, // Bottomless Trap Hole
+  gen_scout: 2, // Mystic Tomato
 };
 
 export function copyLimit(id: string): number {
@@ -88,19 +103,22 @@ export const STARTER_DECKS: Deck[] = [
       ['ember_harrier', 3],
       ['ember_cinder', 2],
       ['ember_matriarch', 2],
-      ['gen_sprite', 2],
-      ['gen_azure', 2],
-      ['gen_dove', 2],
-      ['gen_sentinel', 1],
+      ['gen_gear', 2],
+      ['gen_forge', 2],
       ['ember_nest', 2],
       ['ember_rally', 2],
       ['ember_call', 3],
-      ['gen_insight', 1],
-      ['gen_starfall', 1],
-      ['gen_seconddawn', 1],
-      ['gen_whirlwind', 2],
+      ['gen_furnace', 1],
       ['ember_ignition', 3],
-      ['gen_pitfall', 2],
+      ['gen_veiler', 1],
+      ['gen_sentinel', 1],
+      ['gen_dove', 1],
+      ['gen_starfall', 1],
+      ['gen_whirlwind', 1],
+      ['gen_twisters', 1],
+      ['gen_seconddawn', 1],
+      ['gen_pitfall', 1],
+      ['gen_negate', 1],
     ]),
     extra: expand([
       ['ember_blazehawk', 2],
@@ -118,22 +136,26 @@ export const STARTER_DECKS: Deck[] = [
       ['tide_coralknight', 3],
       ['tide_oracle', 3],
       ['tide_diver', 3],
-      ['gen_azure', 2],
-      ['gen_wolf', 2],
       ['gen_sentinel', 2],
-      ['gen_healer', 1],
+      ['gen_veiler', 2],
+      ['gen_crow', 1],
+      ['gen_wolf', 1],
+      ['gen_dove', 2],
       ['tide_surge', 3],
       ['tide_sanctum', 2],
-      ['gen_insight', 1],
       ['gen_starfall', 1],
-      ['gen_whirlwind', 2],
+      ['gen_whirlwind', 1],
+      ['gen_twisters', 1],
       ['gen_seconddawn', 1],
-      ['gen_ironresolve', 2],
-      ['tide_riptide', 3],
+      ['gen_ironresolve', 1],
+      ['tide_riptide', 2],
       ['tide_whirlpool', 2],
-      ['gen_pitfall', 2],
+      ['gen_pitfall', 1],
       ['gen_barrier', 1],
       ['gen_edict', 1],
+      ['gen_negate', 1],
+      ['gen_bottomless', 1],
+      ['gen_serpent', 1],
     ]),
     extra: expand([
       ['tide_leviathan', 2],
@@ -150,22 +172,25 @@ export const STARTER_DECKS: Deck[] = [
       ['clock_springknight', 2],
       ['clock_sentry', 3],
       ['clock_engine', 2],
-      ['gen_boar', 2],
-      ['gen_azure', 2],
-      ['gen_golem', 2],
+      ['gen_fuse', 2],
+      ['gen_boar', 1],
+      ['gen_golem', 1],
+      ['gen_veiler', 2],
+      ['gen_sentinel', 1],
       ['gen_dove', 1],
       ['clock_fusion', 3],
       ['gen_fusion', 1],
       ['clock_rewind', 2],
-      ['gen_insight', 1],
+      ['gen_requisition', 2],
       ['gen_starfall', 1],
-      ['gen_ironresolve', 2],
+      ['gen_twisters', 1],
+      ['gen_ironresolve', 1],
       ['gen_whirlwind', 1],
       ['clock_overload', 2],
-      ['gen_pitfall', 3],
+      ['gen_pitfall', 2],
       ['gen_barrier', 1],
       ['gen_edict', 1],
-      ['tide_riptide', 2],
+      ['gen_negate', 1],
     ]),
     extra: expand([
       ['clock_titan', 3],
@@ -182,23 +207,26 @@ export const STARTER_DECKS: Deck[] = [
       ['veil_revenant', 3],
       ['veil_shade', 3],
       ['veil_lich', 2],
-      ['gen_sprite', 1],
-      ['gen_ogre', 1],
-      ['gen_healer', 1],
-      ['gen_sentinel', 2],
+      ['gen_hunter', 1],
+      ['gen_crow', 2],
+      ['gen_veiler', 2],
+      ['gen_sentinel', 1],
       ['gen_dove', 1],
       ['veil_requiem', 2],
       ['veil_rebirth', 2],
-      ['gen_insight', 1],
-      ['gen_exchange', 2],
+      ['gen_exchange', 1],
+      ['gen_reincarnation', 1],
       ['gen_starfall', 1],
       ['gen_seconddawn', 1],
       ['gen_whirlwind', 1],
+      ['gen_twisters', 1],
       ['veil_curse', 3],
-      ['gen_pitfall', 2],
+      ['gen_pitfall', 1],
       ['gen_barrier', 1],
       ['gen_edict', 1],
-      ['tide_riptide', 3],
+      ['gen_bottomless', 1],
+      ['gen_negate', 1],
+      ['gen_prison', 1],
     ]),
     extra: expand([
       ['veil_dreadknight', 3],
@@ -222,11 +250,12 @@ export const STARTER_DECKS: Deck[] = [
       ['sun_coronation', 2],
       ['sun_ascend', 3],
       ['sun_shield', 3],
-      ['gen_insight', 1],
+      ['gen_veiler', 2],
+      ['gen_sentinel', 1],
+      ['gen_dove', 1],
       ['gen_starfall', 1],
-      ['gen_sentinel', 2],
-      ['gen_dove', 2],
       ['gen_pitfall', 1],
+      ['gen_negate', 1],
     ]),
     extra: expand([
       ['gen_gauntlet', 2],
@@ -249,11 +278,12 @@ export const STARTER_DECKS: Deck[] = [
       ['mem_abyss', 2],
       ['mem_archive', 2],
       ['mem_whisper', 3],
-      ['gen_insight', 1],
       ['gen_starfall', 1],
-      ['gen_pitfall', 2],
       ['gen_barrier', 1],
       ['gen_edict', 1],
+      ['gen_prison', 1],
+      ['gen_negate', 1],
+      ['gen_haunted', 1],
     ]),
     extra: expand([
       ['gen_gauntlet', 2],

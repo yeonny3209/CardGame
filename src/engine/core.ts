@@ -541,6 +541,8 @@ export class Duel {
       const from = c.location;
       const prevController = c.controller;
       const fromField = this.isOnField(c);
+      // A Continuous Trap bound to a monster (e.g. a revival Trap) takes that monster with it when it leaves.
+      const bound = fromField && c.def.category === 'trap' ? c.equippedTo : null;
       let realDest: Location = dest;
       // Extra Deck monsters return to the Extra Deck instead of hand/deck.
       if ((dest === 'hand' || dest === 'deck') && isExtraDeckMonster(c.def)) realDest = 'extra';
@@ -554,6 +556,10 @@ export class Duel {
       if (realDest === 'banished') this.emit({ type: 'banished', ...base }, t);
       if (realDest === 'hand') this.emit({ type: 'addedToHand', ...base }, t);
       if (fromField) this.cascade(c, by);
+      if (bound) {
+        const m = this.card(bound.uid);
+        if (m.version === bound.version && m.location === 'mzone') this.destroy([m], ['rule'], by);
+      }
     }
     if (opts.shuffle !== false) for (const p of deckPlayers) if (!opts.bottom) this.shuffle(this.players[p].deck);
     return moved;

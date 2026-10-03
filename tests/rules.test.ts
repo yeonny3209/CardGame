@@ -16,7 +16,8 @@ describe('deck construction', () => {
     const base = STARTER_DECKS[0];
     expect(validateDeck({ ...base, main: [...base.main.slice(0, 36), ...expand([['ember_scout', 4]])] }).join()).toMatch(/3장까지/);
     expect(validateDeck({ ...base, main: [...base.main.slice(0, 39), 'gen_cataclysm'] }).join()).toMatch(/금지/);
-    expect(validateDeck({ ...base, main: [...base.main.slice(0, 39), 'gen_insight'] }).join()).toMatch(/1장까지/);
+    expect(validateDeck({ ...base, main: [...base.main.slice(0, 38), 'gen_edict', 'gen_edict'] }).join()).toMatch(/1장까지/);
+    expect(validateDeck({ ...base, main: [...base.main.slice(0, 39), 'gen_insight'] }).join()).toMatch(/금지/);
     expect(validateDeck({ ...base, main: [...base.main.slice(0, 39), 'gen_storm'] }).join()).toMatch(/엑스트라 덱에 넣어야/);
     expect(validateDeck({ ...base, main: base.main.slice(0, 39) }).join()).toMatch(/40~60/);
   });

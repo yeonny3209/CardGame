@@ -84,14 +84,21 @@ export function xyzCombos(duel: Duel, def: CardDef, pool: CardInstance[]): CardI
 export function ritualCombos(duel: Duel, level: number, pool: CardInstance[]): CardInstance[][] {
   const out: CardInstance[][] = [];
   const monsters = pool.filter((c) => c.def.category === 'monster');
-  for (let k = 1; k <= Math.min(5, monsters.length); k++) {
-    for (const combo of combinations(monsters, k)) {
-      const sum = combo.reduce((s, c) => s + duel.level(c), 0);
-      if (sum < level) continue;
+  const lv = (c: CardInstance) => duel.level(c);
+  const rec = (start: number, acc: CardInstance[], sum: number) => {
+    if (sum >= level) {
       // No unnecessary tributes: removing any one must drop below the requirement.
-      if (combo.every((c) => sum - duel.level(c) < level)) out.push(combo);
+      if (acc.every((c) => sum - lv(c) < level)) out.push([...acc]);
+      return;
     }
-  }
+    if (acc.length >= 5) return;
+    for (let i = start; i < monsters.length; i++) {
+      acc.push(monsters[i]);
+      rec(i + 1, acc, sum + lv(monsters[i]));
+      acc.pop();
+    }
+  };
+  rec(0, [], 0);
   return out;
 }
 
