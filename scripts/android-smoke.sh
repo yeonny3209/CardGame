@@ -74,5 +74,7 @@ adb exec-out screencap -p > smoke-duel.png || true
 
 echo "== health =="
 adb shell pidof "$PKG" >/dev/null || fail "the app process is gone"
-if adb logcat -d | grep -q "FATAL EXCEPTION"; then fail "fatal exception in logcat"; fi
+# Only crashes of our own app count. uiautomator (the UI dump tool) sometimes crashes on WebView nodes;
+# that also logs "FATAL EXCEPTION" but with a bare PID and no "Process: <package>" line.
+if adb logcat -d | grep -A3 "FATAL EXCEPTION" | grep -q "Process: $PKG"; then fail "the app crashed"; fi
 echo "SMOKE OK"
