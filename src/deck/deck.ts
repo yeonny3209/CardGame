@@ -104,7 +104,7 @@ export const STARTER_DECKS: Deck[] = [
       ['ember_cinder', 2],
       ['ember_matriarch', 2],
       ['gen_gear', 2],
-      ['gen_forge', 2],
+      ['gen_fuse', 2],
       ['ember_nest', 2],
       ['ember_rally', 2],
       ['ember_call', 3],

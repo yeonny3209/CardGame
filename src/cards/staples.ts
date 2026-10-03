@@ -86,6 +86,7 @@ export const staples: CardDef[] = [
     level: 1,
     atk: 200,
     def: 100,
+    tuner: true,
     text: '①: 이 카드가 상대에 의해 파괴되어 묘지로 보내졌을 경우에 발동한다. 상대에게 800 데미지를 준다.',
     effects: [
       {
@@ -107,6 +108,7 @@ export const staples: CardDef[] = [
     level: 2,
     atk: 700,
     def: 500,
+    tuner: true,
     text: '①: 자신 엔드 페이즈에 발동한다. 이 카드 이외의 자신 필드의 화염 속성 몬스터 1장당 200 데미지를 상대에게 준다.',
     effects: [
       {
