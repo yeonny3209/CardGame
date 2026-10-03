@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'app.arcaneduel'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'app.arcaneduel'
+        minSdk 26
+        targetSdk 34
+        // CI passes the run number so every build can update the previous install.
+        versionCode Integer.parseInt((project.findProperty('appVersionCode') ?: '1').toString())
+        versionName (project.findProperty('appVersionName') ?: '0.1.0').toString()
+    }
+
+    signingConfigs {
+        // A fixed key keeps the signature stable so new builds install over old ones.
+        // It is committed on purpose and is NOT a secret: use your own key for a store release.
+        release {
+            storeFile file('arcane-duel.keystore')
+            storePassword 'arcaneduel'
+            keyAlias 'arcaneduel'
+            keyPassword 'arcaneduel'
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+    }
+}

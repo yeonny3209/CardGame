@@ -54,6 +54,25 @@ npm run build    # 타입 체크 후 dist/ 로 정적 빌드
 - **체인 확인: 자동**은 소환·공격·체인·데미지 스텝·상대 엔드 페이즈에서만 대응 여부를 묻고, **항상**은 발동 가능한 모든 타이밍에 묻습니다.
 - **덱 편집**에서 필터(종류·속성·테마·분류)와 검색으로 카드를 찾아 추가하고, 덱 코드로 덱을 공유할 수 있습니다. 덱은 브라우저에 저장됩니다.
 
+## Android 앱 (APK)
+
+휴대폰에서 설치해 오프라인으로 플레이할 수 있습니다.
+
+- **내려받기**: https://github.com/yeonny3209/CardGame/releases/tag/apk-latest 의 `ArcaneDuel.apk`
+  (푸시할 때마다 GitHub Actions가 빌드해 이 릴리스를 갱신합니다).
+- **설치**: 휴대폰에서 APK를 열고, 안내에 따라 "이 출처의 앱 설치 허용"을 켠 뒤 설치합니다. Android 8.0(API 26) 이상.
+- **오프라인**: 게임 전체가 APK 안에 들어 있고 앱은 인터넷 권한을 요청하지 않습니다. 비행기 모드에서도 동작하고, 만든 덱은 기기에 저장됩니다.
+- **구조**: `android/`는 WebView로 게임을 띄우는 최소한의 앱입니다. 웹 빌드(`dist/`)를 `assets/www`에 복사해 `https://appassets.androidplatform.net/`라는 가상 주소로 제공하며, 그 밖의 요청은 모두 차단합니다.
+- **서명 키**: `android/app/arcane-duel.keystore`는 새 빌드가 이전 설치 위에 덮어써지도록 서명을 고정하는 용도이며 **비밀이 아닙니다**. 스토어에 올릴 때는 직접 만든 키로 바꾸세요.
+
+직접 빌드하려면 JDK 17과 Android SDK가 필요합니다.
+
+```bash
+npm ci && npm run build
+rm -rf android/app/src/main/assets/www && cp -r dist android/app/src/main/assets/www
+cd android && ./gradlew assembleRelease   # android/app/build/outputs/apk/release/app-release.apk
+```
+
 ## 구조
 
 ```

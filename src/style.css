@@ -933,3 +933,19 @@ select {
   display: block;
   clear: both;
 }
+
+/* Touch devices (the Android app): no double-tap zoom, tap flash, text selection or pull-to-refresh bounce. */
+html {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+.card,
+.zone,
+.btn,
+.hand,
+.log {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

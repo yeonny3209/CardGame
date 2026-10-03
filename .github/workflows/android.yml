@@ -1,0 +1,106 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, claude/awesome-turing-ktbg0p]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - name: Bundle the web build into the app
+        run: |
+          rm -rf android/app/src/main/assets/www
+          mkdir -p android/app/src/main/assets
+          cp -r dist android/app/src/main/assets/www
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the release APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease -PappVersionCode=${{ github.run_number }} -PappVersionName=0.1.${{ github.run_number }}
+
+      - name: Verify the APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          echo "== signature =="
+          "$BT/apksigner" verify --verbose --print-certs "$APK"
+          echo "== manifest =="
+          "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion|application-label|launchable-activity|uses-permission)" || true
+          echo "== permissions (none expected: the app is fully offline) =="
+          "$BT/aapt2" dump permissions "$APK"
+          if "$BT/aapt2" dump permissions "$APK" | grep -q "uses-permission"; then echo "unexpected permission"; exit 1; fi
+          echo "== bundled game =="
+          unzip -l "$APK" | grep -E "assets/www/(index.html|assets/)"
+          cp "$APK" ArcaneDuel.apk
+          ls -l ArcaneDuel.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcaneDuel-apk
+          path: ArcaneDuel.apk
+
+      - name: Publish the APK as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete apk-latest --cleanup-tag --yes || true
+          gh release create apk-latest ArcaneDuel.apk \
+            --target "$GITHUB_SHA" \
+            --title "Arcane Duel APK (build ${{ github.run_number }})" \
+            --notes "빌드 ${{ github.run_number }} · 커밋 ${GITHUB_SHA::7}. ArcaneDuel.apk를 휴대폰에 내려받아 설치하세요. 인터넷 권한이 없고 게임 전체가 앱 안에 들어 있어 오프라인에서도 동작합니다."
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ArcaneDuel-apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the app on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: ./scripts/android-smoke.sh ArcaneDuel.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screenshots
+          path: smoke-*.png
+          if-no-files-found: ignore

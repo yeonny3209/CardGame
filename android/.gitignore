@@ -1,0 +1,5 @@
+.gradle/
+build/
+local.properties
+# The web build is copied in by the build (see README / .github/workflows/android.yml).
+app/src/main/assets/www/
